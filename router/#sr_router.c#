@@ -80,7 +80,9 @@ void sr_handlepacket(struct sr_instance* sr,
   printf("*** -> Received packet of length %d \n",len);
 
   /* fill in code here */
-  // Is this an IP Requst?
+
+
+  // Is incoming IP PACKET?
      // CASE: ARP Request, Find all packets waiting on this request, update their dest. addr, send them out.
      // CASE: TCP/UDP packet, drop packet, send back ICMP "HOST UNREACHABLE MESSAGE"
   // If this is an ICMP ping
