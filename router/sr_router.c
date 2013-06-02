@@ -41,10 +41,12 @@ void process_arp(sr_instance_t *, uint8_t *, int, int);
 void process_ip_packet(sr_instance_t *, char *, unsigned int);
 sr_if * get_interface_by_ip(sr_instance_t *, uint32_t);
 void handle_arp_request(sr_instance_t *,  sr_arp_hdr_t *, int, uint8_t *);
+int is_icmp(uint8_t * packet, int len);
 void handle_arp_reply(sr_instance_t *, sr_arp_hdr_t *);
 int check_eth_packet(int, int);
 int check_arp_packet(int, int);
 void send_arp_reply(sr_instance_t *, sr_if *, sr_arp_hdr_t *); 
+int check_ip_packet(int len, int min_length);
 
 void sr_init(struct sr_instance* sr)
 {
@@ -98,6 +100,17 @@ int check_arp_packet(int len, int min_length){
     return 1;
 }
 
+
+int check_ip_packet(int len, int min_length){
+    /* sanity check on arp packet */
+    if (min_length + sizeof(sr_ip_hdr_t) < len){
+        printf("too small to be a valid ip packet\n");
+        return 0;
+    }
+    return 1;
+}
+
+
 void sr_handlepacket(struct sr_instance* sr,
 		     uint8_t * packet    /* lent */,
 		     unsigned int len,
@@ -107,7 +120,11 @@ void sr_handlepacket(struct sr_instance* sr,
     assert(sr);
     assert(packet);
     assert(interface);
-
+    printf("***********************************************************\n"
+           "*                                                         *\n"
+           "**               HANDLING A NEW PACKET                   **\n"
+           "*                                                         *\n"
+           "***********************************************************\n");
     print_hdrs(packet, len);
 
     /* sanity check on eth packet */
@@ -130,21 +147,60 @@ void sr_handlepacket(struct sr_instance* sr,
 
     	break;
     case ethertype_ip:
-	print_hdr_ip(packet); 
-	/*	process_ip_packet(sr, packet, len);  */
+
+        /* sanity check on ip packet */
+
+        if (is_icmp(packet, len)){
+            printf("this is an icmp\n");
+        } else {
+            printf("this is not an icmp packet\n");
+            /*            process_ip_packet(sr, packet, len); */
+        }
     	break;
     default: /* if unknow, this is an error, send ICMP of 'unreachable' */
     	break;
     }
 }
 
-struct sr_if * get_interface_by_ip(struct sr_instance * sr, uint32_t tip){
+int is_icmp(uint8_t * packet, int len){
+    uint8_t ip_proto = ip_protocol(packet + sizeof(sr_ethernet_hdr_t));
+    if (ip_proto == ip_protocol_icmp)  /* ICMP */
+        return 1;
+    return 0;
+    /*   minlength += sizeof(sr_icmp_hdr_t); */
+    /*   if (length < minlength) */
+    /*     fprintf(stderr, "Failed to print ICMP header, insufficient length\n"); */
+    /*   else */
+    /*     print_hdr_icmp(buf + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)); */
+    /* } */
+}
+
+
+struct sr_if * get_router_interface_by_ip(struct sr_instance * sr, uint32_t tip){
     struct sr_if * runner = sr->if_list;
     while (runner != NULL){
-	if (runner->ip == tip)
-	    return runner;
-	runner = runner->next;
+        if (runner->ip == tip)
+            return runner;
+        runner = runner->next;
     }
+    return NULL;
+}
+
+struct sr_if * get_foreign_interface_by_ip(struct sr_instance * sr, uint32_t tip){
+    struct sr_rt * runner = sr->routing_table;
+    char buff[INET_ADDRSTRLEN];
+    printf("ip is %u (%s) \n", tip, inet_ntop(AF_INET, &tip, buff, INET_ADDRSTRLEN));
+
+    while (runner != NULL) {
+        sr_print_routing_entry(runner);
+	if (runner->dest.s_addr == tip) {
+            printf("found a matching entry in the routing table\n"
+                   "entry interface is %s\n", runner->interface);
+	    return sr_get_interface(sr, runner->interface);
+        }
+        runner = runner->next;
+    }
+    printf("did not match any entry in our routing table\n");
     return NULL;
 }
 
@@ -168,13 +224,10 @@ void send_arp_reply(sr_instance_t *  sr,
     memcpy(eth_head->ether_dhost, arp_packet->ar_sha, ETHER_ADDR_LEN);
 
     /* copy interface mac addr to ether_shost*/
-    memcpy(eth_head->ether_shost, interface->name, ETHER_ADDR_LEN);
+    memcpy(eth_head->ether_shost, interface->addr, ETHER_ADDR_LEN);
 
     /* set ethernet type to arp req */
-    eth_head->ether_type = ethertype_arp;
-
-    /* set ether type */
-    eth_head->ether_type = ethertype_arp;
+    eth_head->ether_type = htons(ethertype_arp);
 
     /* ------------- Populate arp header -------------- */
     memcpy(arp_head, arp_packet, sizeof(sr_arp_hdr_t));
@@ -185,11 +238,7 @@ void send_arp_reply(sr_instance_t *  sr,
     /* Set target IP address. Take it from source IP address */
     arp_head->ar_tip = arp_packet->ar_sip;
 
-    /* Set source MAC address. Take from Dest. MAC address */
-    printf("update routing table\n");
-    if (sr_load_rt(sr, "rtable") == 0) /* success */
-        sr_print_routing_table(sr);
-    
+    /* Set target MAC address. Take from source hwa of arp */
     memcpy(arp_head->ar_tha, arp_packet->ar_sha, ETHER_ADDR_LEN);
 
     /* take source hw addr, put into thw addr */
@@ -198,10 +247,10 @@ void send_arp_reply(sr_instance_t *  sr,
     /* set source ip to be target ip */
     arp_head->ar_sip = arp_packet->ar_tip;
 
-    printf("printing ethernet header\n");
+    printf("printing ethernet header of new packet\n");
     print_hdr_eth(new_packet);
 
-    printf("printing arp header\n");
+    printf("printing arp header of new packet\n");
     print_hdr_arp(new_packet + sizeof(sr_ethernet_hdr_t));
 
     /*** send him on his way ***/
@@ -214,36 +263,33 @@ void send_arp_reply(sr_instance_t *  sr,
 /****************************************************************/
 
     sr_send_packet(sr, new_packet, size, interface->name);
-
+    printf("sent\n");
     free(new_packet); /* lookup freeing? */
 }
-
-
 
 void handle_arp_request(struct sr_instance *  sr, sr_arp_hdr_t * arp_hdr, int len, uint8_t * packet){
     /* In the case of an ARP request, you should only send an ARP reply
        if the target IP address is one of your router's IP addresses. */
     /* ARP replies are sent directly to the requester's MAC address. */
 
-    /* printing interface list */
-    printf("Printing list of interfaces\n");
-    sr_print_if_list(sr);
+    sr_if * interface;
 
-    sr_if * interface = get_interface_by_ip(sr, arp_hdr->ar_tip); 
-
-    if (interface) {
-        printf("printing interface\n");
+    if ((interface = get_router_interface_by_ip(sr, arp_hdr->ar_tip)) != NULL) {
+        printf("router interface\n");
         sr_print_if(interface);
         send_arp_reply(sr, interface, arp_hdr);
-    } else {
+    } else if ((interface = get_foreign_interface_by_ip(sr, arp_hdr->ar_tip)) != NULL){
+        printf("foreign interface\n");
+        sr_print_if(interface);        
+        send_arp_reply(sr, interface, arp_hdr);
+    }
+    else {
         printf("NOT FOUND: INTERFACE\n");
         /* how to handle this? */
         /* not meant for us (target ip not in interface list, 
            therefore, no ARP reply sent */
     }
     
-
-    printf("handling arp req");
 
     /*    if (interface) 
 
@@ -258,17 +304,7 @@ void handle_arp_request(struct sr_instance *  sr, sr_arp_hdr_t * arp_hdr, int le
 /* function to process arp requests and replies */
 void process_arp(struct sr_instance * sr, uint8_t * packet, int packet_len, int min_length){
 
-    printf("trying to print header arp\n");
-
     sr_arp_hdr_t * arp_packet = (sr_arp_hdr_t *)(packet + min_length);
-
-    printf("before print header arp \n");
-
-    /* this works */
-    print_hdr_arp(packet + min_length);
-
-    printf("after print, header arp\n");
-    printf("op code: %d\n", ntohs(arp_packet->ar_op));
 
     switch (ntohs(arp_packet->ar_op)){
     case arp_op_request:
@@ -351,44 +387,43 @@ void process_arp(struct sr_instance * sr, uint8_t * packet, int packet_len, int 
 /* } */
 
 
-/* /\* function to process arp requests and replies *\/ */
-/* void process_ip_packet(struct sr_instance * instance, char * ip_packet_str, unsigned int len){ */
-/*     sr_ip_hdr_t * ip_header = sanity_check(ip_packet_str, len); */
-/*     if (ip_header) { */
-/* 	if_sr * interface = in_interface_list(instance, ip_header->ip_dst); */
-/* 	/\* if the frame contains an IP packet that is not destined towards one of our interfaces *\/ */
-/* 	if (interface){ */
+/* function to process ip requests and replies */
+void process_ip_packet(struct sr_instance * instance, char * ip_packet_str, unsigned int len){
+    sr_ip_hdr_t * ip_header = sanity_check(ip_packet_str, len);
+    if (ip_header) {
+	if_sr * interface = in_foreign_interface_list(instance, ip_header->ip_dst);
+        /* if the frame contains an IP packet that is not destined towards one of our interfaces */
+	if (interface){
 
-/* 	    /\* decrement ttl by 1*\/ */
-/* 	    ip_header->ip_ttl--; */
+	    /* decrement ttl by 1*/
+	    ip_header->ip_ttl--;
 
-/* 	    /\* recompute packet checksum over modified header *\/ */
-/* 	    ip_header->ip_sum = cksum(ip_packet_str, ip_packet_length); */
+	    /* recompute packet checksum over modified header */
+	    ip_header->ip_sum = cksum(ip_packet_str, ip_packet_length);
 	    
-/* 	    /\* find which entry in the routing table has the longest prefix match with the destination IP address *\/ */
-/* 	    /\* struct sr_rt* routing_table; -- routing table *\/  */
-/* 	    sr_rt * match = find_longest_prefix_match(instance, ip_header->ip_dst); */
+	    /* find which entry in the routing table has the longest prefix match with the destination IP address */
+	    /* struct sr_rt* routing_table; -- routing table */
+	    sr_rt * match = find_longest_prefix_match(instance, ip_header->ip_dst);
 
 
-/* 	} */
+	}
 
 	
-/*     } else { */
-/* 	// packet does not pass sanity check, send icmp error? */
-/*     } */
+    } else {
+	// packet does not pass sanity check, send icmp error?
+    }
 
 
-/*     /\* if the frame contains an IP packet that is not destined towards one of our interfaces *\/ */
-/*     if (interface == NULL){ */
-/* 	/\* sanity check *\/ */
+    /* if the frame contains an IP packet that is not destined towards one of our interfaces */
+    if (interface == NULL){
+	/* sanity check */
 
-/*     } */
+    }
 
-
-/*       /\* process ip *\/ */
+      /* process ip */
       
-/*       return; */
-/*   } */
+      return;
+  }
 
 
 
