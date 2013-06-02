@@ -32,14 +32,19 @@
  *
  *---------------------------------------------------------------------*/
 
+/* typedefs */
+typedef struct sr_if sr_if;
+typedef struct sr_instance sr_instance_t;
+
 /* prototype */
-void process_arp(struct sr_instance *, uint8_t *, int, int);
-void process_ip_packet(struct sr_instance *, char *, unsigned int);
-struct sr_if * get_interface_by_ip(struct sr_instance *, uint32_t);
-void handle_arp_request(struct sr_instance *,  sr_arp_hdr_t *);
-void handle_arp_reply(struct sr_instance *, sr_arp_hdr_t *);
+void process_arp(sr_instance_t *, uint8_t *, int, int);
+void process_ip_packet(sr_instance_t *, char *, unsigned int);
+sr_if * get_interface_by_ip(sr_instance_t *, uint32_t);
+void handle_arp_request(sr_instance_t *,  sr_arp_hdr_t *, int, uint8_t *);
+void handle_arp_reply(sr_instance_t *, sr_arp_hdr_t *);
 int check_eth_packet(int, int);
 int check_arp_packet(int, int);
+void send_arp_reply(sr_instance_t *, sr_if *, sr_arp_hdr_t *); 
 
 void sr_init(struct sr_instance* sr)
 {
@@ -93,7 +98,6 @@ int check_arp_packet(int len, int min_length){
     return 1;
 }
 
-
 void sr_handlepacket(struct sr_instance* sr,
 		     uint8_t * packet    /* lent */,
 		     unsigned int len,
@@ -104,7 +108,6 @@ void sr_handlepacket(struct sr_instance* sr,
     assert(packet);
     assert(interface);
 
-    printf("*** -> Received packet of length %d \n", len);
     print_hdrs(packet, len);
 
     /* sanity check on eth packet */
@@ -123,7 +126,6 @@ void sr_handlepacket(struct sr_instance* sr,
 
         /* if passes process */
         printf("processing arp packet\n");
-	print_hdr_eth(packet);
 	process_arp(sr, packet, len, min_length); 
 
     	break;
@@ -146,50 +148,79 @@ struct sr_if * get_interface_by_ip(struct sr_instance * sr, uint32_t tip){
     return NULL;
 }
 
-/* void send_arp_reply(struct sr_instance *  sr,  struct sr_if * interface, struct sr_arp_hdr_t * arp_packet){ */
+void send_arp_reply(sr_instance_t *  sr, 
+                    sr_if * interface, 
+                    sr_arp_hdr_t * arp_packet){
+
+    /* send arp packet */
+    printf("sending arp packet\n");
+
+    /* construct packet, malloc memory for packet */
+    /* fill packet with relevant arp and ethernet data */
+    size_t size                  = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t);
+    uint8_t * new_packet         = malloc(size);
+    sr_ethernet_hdr_t * eth_head = (sr_ethernet_hdr_t *)new_packet;
+    sr_arp_hdr_t * arp_head      = (sr_arp_hdr_t *)(new_packet + sizeof(sr_ethernet_hdr_t));
+
+    /* ------------ Populate ethernet header----------- */
+
+    /* copy source hw addr to eth head dhost */
+    memcpy(eth_head->ether_dhost, arp_packet->ar_sha, ETHER_ADDR_LEN);
+
+    /* copy interface mac addr to ether_shost*/
+    memcpy(eth_head->ether_shost, interface->name, ETHER_ADDR_LEN);
+
+    /* set ethernet type to arp req */
+    eth_head->ether_type = ethertype_arp;
+
+    /* set ether type */
+    eth_head->ether_type = ethertype_arp;
+
+    /* ------------- Populate arp header -------------- */
+    memcpy(arp_head, arp_packet, sizeof(sr_arp_hdr_t));
+
+    /* set op code */
+    arp_head->ar_op = htons(arp_op_reply);
+
+    /* Set target IP address. Take it from source IP address */
+    arp_head->ar_tip = arp_packet->ar_sip;
+
+    /* Set source MAC address. Take from Dest. MAC address */
+    printf("update routing table\n");
+    if (sr_load_rt(sr, "rtable") == 0) /* success */
+        sr_print_routing_table(sr);
     
-/*     /\* send arp packet *\/ */
-/*     /\* construct packet, malloc memory for packet *\/ */
-/*     /\* fill packet with relevant arp and ethernet data *\/ */
-/*     size_t                   len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t); */
-/*     char              *   packet = malloc(len); */
-/*     sr_ethernet_hdr_t * eth_head = (struct sr_ethernet_hdr_t *)packet; */
-/*     sr_arp_hdr_t      * arp_head = (struct sr_arp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t)); */
+    memcpy(arp_head->ar_tha, arp_packet->ar_sha, ETHER_ADDR_LEN);
 
-/*     /\* ------------ Populate ethernet header----------- *\/ */
-/*     /\* copy source hw addr to eth head dhost *\/ */
-/*     memcpy(eth_head->ether_dhost, arp_packet->ar_sha, ETHER_ADDR_LEN);     */
+    /* take source hw addr, put into thw addr */
+    memcpy(arp_head->ar_sha, interface->addr, ETHER_ADDR_LEN);
 
-/*     /\* copy interface mac addr to ether_shost*\/ */
-/*     memcpy(eth_head->ether_shost, interface->name,    ETHER_ADDR_LEN);     */
+    /* set source ip to be target ip */
+    arp_head->ar_sip = arp_packet->ar_tip;
 
-/*     /\* set ethernet type to arp req *\/ */
-/*     eth_head->ether_type = ethertype_arp;                                    */
+    printf("printing ethernet header\n");
+    print_hdr_eth(new_packet);
 
-/*     /\* ------------- Populate arp header -------------- *\/ */
-/*     memcpy(arp_head, arp_packet);  */
+    printf("printing arp header\n");
+    print_hdr_arp(new_packet + sizeof(sr_ethernet_hdr_t));
 
-/*     /\* make arp reply *\/ */
-/*     arp_head->ar_op  = arp_op_reply;                              */
+    /*** send him on his way ***/
 
-/*     /\* take source ip from request and put it into target ip reply *\/ */
-/*     arp_head->ar_tip = arp_packet->ar_sip; */
+/****************************************************************/
+/* int sr_send_packet(struct sr_instance* sr /\* borrowed *\/,  */
+/*                          uint8_t* buf /\* borrowed *\/ ,     */
+/*                          unsigned int len,                   */
+/*                          const char* iface /\* borrowed *\/) */
+/****************************************************************/
 
-/*     /\* take source from request put in reply to target *\/ */
-/*     memcpy(arp_head->ar_tha, arp_packet->ar_sha, ETHER_ADDR_LEN);  */
+    sr_send_packet(sr, new_packet, size, interface->name);
 
-/*     /\* take source hw addr, put into thw addr *\/ */
-/*     memcpy(arp_head->ar_sha, interface->name,    ETHER_ADDR_LEN); */
+    free(new_packet); /* lookup freeing? */
+}
 
-/*     /\* set source ip to be target ip *\/ */
-/*     arp_head->ar_sip = arp_packet->tip; */
 
-/*     /\*** send him on his way ***\/ */
-/*     sr_send_packet(sr, packet, len, sr_if->name); */
-/*     free(packet); /\* lookup freeing? *\/ */
-/* } */
 
-void handle_arp_request(struct sr_instance *  sr, sr_arp_hdr_t * arp_hdr){
+void handle_arp_request(struct sr_instance *  sr, sr_arp_hdr_t * arp_hdr, int len, uint8_t * packet){
     /* In the case of an ARP request, you should only send an ARP reply
        if the target IP address is one of your router's IP addresses. */
     /* ARP replies are sent directly to the requester's MAC address. */
@@ -198,14 +229,25 @@ void handle_arp_request(struct sr_instance *  sr, sr_arp_hdr_t * arp_hdr){
     printf("Printing list of interfaces\n");
     sr_print_if_list(sr);
 
-    /*    sr_if * interface = get_interface_by_ip(sr,
-          arp_hdr->ar_tip); */
+    sr_if * interface = get_interface_by_ip(sr, arp_hdr->ar_tip); 
+
+    if (interface) {
+        printf("printing interface\n");
+        sr_print_if(interface);
+        send_arp_reply(sr, interface, arp_hdr);
+    } else {
+        printf("NOT FOUND: INTERFACE\n");
+        /* how to handle this? */
+        /* not meant for us (target ip not in interface list, 
+           therefore, no ARP reply sent */
+    }
+    
 
     printf("handling arp req");
 
     /*    if (interface) 
-          send_arp_reply(sr, interface, arp_hdr); */
-    /* else... what do I do if arp req is not in router interface list? */
+
+     else... what do I do if arp req is not in router interface list? */
 }
 
 /* void handle_arp_reply(sr_arp_hdr_t * arp_header){ */
@@ -231,7 +273,7 @@ void process_arp(struct sr_instance * sr, uint8_t * packet, int packet_len, int 
     switch (ntohs(arp_packet->ar_op)){
     case arp_op_request:
         printf("this is an op request\n");
-	handle_arp_request(sr, arp_packet);
+	handle_arp_request(sr, arp_packet, packet_len, packet);
 	break;
     case arp_op_reply:
         printf("this is an op reply\n");
