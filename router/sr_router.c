@@ -14,7 +14,8 @@
 
 #include <stdio.h>
 #include <assert.h>
-
+#include <stdlib.h>
+#include <string.h>
 
 #include "sr_if.h"
 #include "sr_rt.h"
@@ -30,6 +31,15 @@
  * Initialize the routing subsystem
  *
  *---------------------------------------------------------------------*/
+
+/* prototype */
+void process_arp(struct sr_instance *, uint8_t *, int, int);
+void process_ip_packet(struct sr_instance *, char *, unsigned int);
+struct sr_if * get_interface_by_ip(struct sr_instance *, uint32_t);
+void handle_arp_request(struct sr_instance *,  sr_arp_hdr_t *);
+void handle_arp_reply(struct sr_instance *, sr_arp_hdr_t *);
+int check_eth_packet(int, int);
+int check_arp_packet(int, int);
 
 void sr_init(struct sr_instance* sr)
 {
@@ -48,8 +58,6 @@ void sr_init(struct sr_instance* sr)
     pthread_create(&thread, &(sr->attr), sr_arpcache_timeout, sr);
     
     /* Add initialization code here! */
-    
-
 } /* -- sr_init -- */
 
 /*---------------------------------------------------------------------
@@ -68,35 +76,68 @@ void sr_init(struct sr_instance* sr)
  *
  *---------------------------------------------------------------------*/
 
+int check_eth_packet(int len, int min_length){
+    if (len < min_length) {
+        printf("error eth packet too small\n");
+        return 0;
+    }
+    return 1;
+}
+
+int check_arp_packet(int len, int min_length){
+    /* sanity check on arp packet */
+    if (min_length + sizeof(sr_arp_hdr_t) < len){
+        printf("too small to be a valid arp packet\n");
+        return 0;
+    }
+    return 1;
+}
+
+
 void sr_handlepacket(struct sr_instance* sr,
 		     uint8_t * packet    /* lent */,
 		     unsigned int len,
 		     char* interface     /* lent */)
 {
-    /* payload */
-    char * payload = packet + sizeof(sr_ethernet_hdr_t);
-
-  /* REQUIRES */
+   /* REQUIRES */
     assert(sr);
     assert(packet);
     assert(interface);
 
-    printf("*** -> Received packet of length %d \n",len);
+    printf("*** -> Received packet of length %d \n", len);
+    print_hdrs(packet, len);
 
+    /* sanity check on eth packet */
+    int min_length = sizeof(sr_ethernet_hdr_t);
+    if (!check_eth_packet(len, min_length))
+        return;
+
+    /* switch on eth type if passes sanity check */
     switch (ethertype(packet)){
+
     case ethertype_arp:
-	process_arp(payload);
-	break;
+
+        /* sanity chck on arp packet */
+        if (!check_arp_packet(len, min_length))
+            return;
+
+        /* if passes process */
+        printf("processing arp packet\n");
+	print_hdr_eth(packet);
+	process_arp(sr, packet, len, min_length); 
+
+    	break;
     case ethertype_ip:
-	process_ip_packet(sr, payload, len);
-	break;
+	print_hdr_ip(packet); 
+	/*	process_ip_packet(sr, packet, len);  */
+    	break;
     default: /* if unknow, this is an error, send ICMP of 'unreachable' */
-	break;
+    	break;
     }
 }
 
-sr_if * in_interface_list(struct sr_instance * sr, uint32_t tip){
-    sr_if * runner = sr->if_list;
+struct sr_if * get_interface_by_ip(struct sr_instance * sr, uint32_t tip){
+    struct sr_if * runner = sr->if_list;
     while (runner != NULL){
 	if (runner->ip == tip)
 	    return runner;
@@ -105,201 +146,222 @@ sr_if * in_interface_list(struct sr_instance * sr, uint32_t tip){
     return NULL;
 }
 
-void send_arp_reply(struct sr_instance *  sr,  sr_if * interface, sr_arp_hdr_t * arp_packet){
+/* void send_arp_reply(struct sr_instance *  sr,  struct sr_if * interface, struct sr_arp_hdr_t * arp_packet){ */
     
-    /* send arp packet */
-    /* construct packet, malloc memory for packet */
-    /* fill packet with relevant arp and ethernet data */
-    size_t                   len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
-    char              *   packet = malloc(len);
-    sr_ethernet_hdr_t * eth_head = (sr_ethernet_hdr_t *)packet;
-    sr_arp_hdr_t      * arp_head = (sr_arp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+/*     /\* send arp packet *\/ */
+/*     /\* construct packet, malloc memory for packet *\/ */
+/*     /\* fill packet with relevant arp and ethernet data *\/ */
+/*     size_t                   len = sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t); */
+/*     char              *   packet = malloc(len); */
+/*     sr_ethernet_hdr_t * eth_head = (struct sr_ethernet_hdr_t *)packet; */
+/*     sr_arp_hdr_t      * arp_head = (struct sr_arp_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t)); */
 
-    /* ------------ Populate ethernet header----------- */
-    /* copy source hw addr to eth head dhost */
-    memcpy(eth_head->ether_dhost, arp_packet->ar_sha, ETHER_ADDR_LEN);    
+/*     /\* ------------ Populate ethernet header----------- *\/ */
+/*     /\* copy source hw addr to eth head dhost *\/ */
+/*     memcpy(eth_head->ether_dhost, arp_packet->ar_sha, ETHER_ADDR_LEN);     */
 
-    /* copy interface mac addr to ether_shost*/
-    memcpy(eth_head->ether_shost, interface->name,    ETHER_ADDR_LEN);    
+/*     /\* copy interface mac addr to ether_shost*\/ */
+/*     memcpy(eth_head->ether_shost, interface->name,    ETHER_ADDR_LEN);     */
 
-    /* set ethernet type to arp req */
-    eth_head->eth_type = ethertype_arp;                                   
+/*     /\* set ethernet type to arp req *\/ */
+/*     eth_head->ether_type = ethertype_arp;                                    */
 
-    /* ------------- Populate arp header -------------- */
-    memcpy(arp_head, arp_packet); 
+/*     /\* ------------- Populate arp header -------------- *\/ */
+/*     memcpy(arp_head, arp_packet);  */
 
-    /* make arp reply */
-    arp_head->ar_op  = arp_op_reply;                             
+/*     /\* make arp reply *\/ */
+/*     arp_head->ar_op  = arp_op_reply;                              */
 
-    /* take source ip from request and put it into target ip reply */
-    arp_head->ar_tip = arp_packet->ar_sip;
+/*     /\* take source ip from request and put it into target ip reply *\/ */
+/*     arp_head->ar_tip = arp_packet->ar_sip; */
 
-    /* take source from request put in reply to target */
-    memcpy(arp_head->ar_tha, arp_packet->ar_sha, ETHER_ADDR_LEN); 
+/*     /\* take source from request put in reply to target *\/ */
+/*     memcpy(arp_head->ar_tha, arp_packet->ar_sha, ETHER_ADDR_LEN);  */
 
-    /* take source hw addr, put into thw addr */
-    memcpy(arp_head->ar_sha, interface->name,    ETHER_ADDR_LEN);
+/*     /\* take source hw addr, put into thw addr *\/ */
+/*     memcpy(arp_head->ar_sha, interface->name,    ETHER_ADDR_LEN); */
 
-    /* set source ip to be target ip */
-    arp_head->ar_sip = arp_packet->tip;
+/*     /\* set source ip to be target ip *\/ */
+/*     arp_head->ar_sip = arp_packet->tip; */
 
-    /*** send him on his way ***/
-    sr_send_packet(sr, packet, len, sr_if->name);
-    free(packet); /* lookup freeing? */
-}
+/*     /\*** send him on his way ***\/ */
+/*     sr_send_packet(sr, packet, len, sr_if->name); */
+/*     free(packet); /\* lookup freeing? *\/ */
+/* } */
 
-void handle_arp_request(struct sr_instance *  sr,  sr_arp_hdr_t * arp_packet){
-    /* In the case of an ARP request, you should only send an ARP reply 
+void handle_arp_request(struct sr_instance *  sr, sr_arp_hdr_t * arp_hdr){
+    /* In the case of an ARP request, you should only send an ARP reply
        if the target IP address is one of your router's IP addresses. */
     /* ARP replies are sent directly to the requester's MAC address. */
-    
-    sr_if * interface = interface_list(sr, arp_packet->tip);
-    if (interface)
-	send_arp_reply(sr, interface, arp_packet);
+
+    /* printing interface list */
+    printf("Printing list of interfaces\n");
+    sr_print_if_list(sr);
+
+    /*    sr_if * interface = get_interface_by_ip(sr,
+          arp_hdr->ar_tip); */
+
+    printf("handling arp req");
+
+    /*    if (interface) 
+          send_arp_reply(sr, interface, arp_hdr); */
     /* else... what do I do if arp req is not in router interface list? */
 }
 
-void handle_arp_reply(sr_arp_hdr_t * arp_header){
-    char * payload = arp_packet + sizeof(sr_arp_hdr_t);
-    /* if we get a arp reply not meant for us, throw away */
-}
-
-
-  /* function to process arp requests and replies */
-  void process_arp(char * arp_packet_str){
-      sr_arp_hdr_t * arp_packet = (sr_arp_hdr_t *)arp_packet_str;
-      switch (arp_packet->op_code){
-      case arp_op_request:
-	  handle_arp_request(arp_packet);
-	  break;
-      case arp_op_reply:
-	  handle_arp_reply(arp_packet);
-	  break;
-      }
-      return;
-  }
-
-/* struct sr_ip_hdr */
-/*   { */
-/* #if __BYTE_ORDER == __LITTLE_ENDIAN */
-/*     unsigned int ip_hl:4;		/\* header length *\/ */
-/*     unsigned int ip_v:4;		/\* version *\/ */
-/* #elif __BYTE_ORDER == __BIG_ENDIAN */
-/*     unsigned int ip_v:4;		/\* version *\/ */
-/*     unsigned int ip_hl:4;		/\* header length *\/ */
-/* #else */
-/* #error "Byte ordering ot specified "  */
-/* #endif  */
-/*     uint8_t ip_tos;			/\* type of service *\/ */
-/*     uint16_t ip_len;			/\* total length *\/ */
-/*     uint16_t ip_id;			/\* identification *\/ */
-/*     uint16_t ip_off;			/\* fragment offset field *\/ */
-/* #define	IP_RF 0x8000			/\* reserved fragment flag *\/ */
-/* #define	IP_DF 0x4000			/\* dont fragment flag *\/ */
-/* #define	IP_MF 0x2000			/\* more fragments flag *\/ */
-/* #define	IP_OFFMASK 0x1fff		/\* mask for fragmenting bits *\/ */
-/*     uint8_t ip_ttl;			/\* time to live *\/ */
-/*     uint8_t ip_p;			/\* protocol *\/ */
-/*     uint16_t ip_sum;			/\* checksum *\/ */
-/*     uint32_t ip_src, ip_dst;	/\* source and dest address *\/ */
-/*   } __attribute__ ((packed)) ; */
-/* typedef struct sr_ip_hdr sr_ip_hdr_t; */
-
-sr_ip_hdr_t * sanity_check(char * ip_packet_str, len){
-
-    /* Sanity-check the packet (meets minimum length and has correct checksum). */
-    /* uint16_t cksum (const void *_data, int len) */
-
-    sr_ip_hdr_t * ip_header       = (sr_ip_hdr_t *)ip_packet_str;	
-    unsigned int ip_packet_length = len - sizeof(ether_addr_len);
-
-    if (ip_packet_length < sizeof(sr_ip_hdr_t)) 
-	return NULL;
-
-    if (cksum(ip_packet_str, ip_packet_length) != ip_hdr->ip_sum)
-	return NULL;
-	
-
-    return ip_header;	
-}
-
-int longest_match(char * x, char * dest){
-    int i = 0;
-    while (x[i] == dest[i])
-	i++;
-    return i;
-}
-
-sr_rt * find_longest_prefix_match(struct sr_instance * instance, uint32_t dest){
-    sr_rt * runner        = instance->routing_table, 
-            longest       = NULL;
-    int     longest_match = 0;
-
-    while (runner){
-	int current_match_size = longest_match((char *)&runner->dest->s_addr, (char *)&dest);
-        if (longest_match < curent_match_size)
-	    longest        = runner;
-	    longest_match  = current_match_size;
-	}
-	runner = runner->next;
-    }
-    return longest;
-}
-
+/* void handle_arp_reply(sr_arp_hdr_t * arp_header){ */
+/*     char * payload = arp_packet + sizeof(sr_arp_hdr_t); */
+/*     /\* if we get a arp reply not meant for us, throw away *\/ */
+/* } */
 
 /* function to process arp requests and replies */
-void process_ip_packet(struct sr_instance * instance, char * ip_packet_str, unsigned int len){
-    sr_ip_hdr_t * ip_header = sanity_check(ip_packet_str, len);
-    if (ip_header) {
-	if_sr * interface = in_interface_list(instance, ip_header->ip_dst);
-	/* if the frame contains an IP packet that is not destined towards one of our interfaces */
-	if (interface){
+void process_arp(struct sr_instance * sr, uint8_t * packet, int packet_len, int min_length){
 
-	    /* decrement ttl by 1*/
-	    ip_header->ip_ttl--;
+    printf("trying to print header arp\n");
 
-	    /* recompute packet checksum over modified header */
-	    ip_header->ip_sum = cksum(ip_packet_str, ip_packet_length);
-	    
-	    /* find which entry in the routing table has the longest prefix match with the destination IP address */
-	    /* struct sr_rt* routing_table; -- routing table */ 
-	    sr_rt * match = find_longest_prefix_match(instance, ip_header->ip_dst);
+    sr_arp_hdr_t * arp_packet = (sr_arp_hdr_t *)(packet + min_length);
 
+    printf("before print header arp \n");
 
-	}
+    /* this works */
+    print_hdr_arp(packet + min_length);
 
-	
-    } else {
-	// packet does not pass sanity check, send icmp error?
+    printf("after print, header arp\n");
+    printf("op code: %d\n", ntohs(arp_packet->ar_op));
+
+    switch (ntohs(arp_packet->ar_op)){
+    case arp_op_request:
+        printf("this is an op request\n");
+	handle_arp_request(sr, arp_packet);
+	break;
+    case arp_op_reply:
+        printf("this is an op reply\n");
+        /*	handle_arp_reply(sr, arp_packet); */
+	break;
     }
-
-
-    /* if the frame contains an IP packet that is not destined towards one of our interfaces */
-    if (interface == NULL){
-	/* sanity check */
-
-    }
-
-
-      /* process ip */
-      
-      return;
+    return;
   }
 
+/* /\* struct sr_ip_hdr *\/ */
+/* /\*   { *\/ */
+/* /\* #if __BYTE_ORDER == __LITTLE_ENDIAN *\/ */
+/* /\*     unsigned int ip_hl:4;		/\\* header length *\\/ *\/ */
+/* /\*     unsigned int ip_v:4;		/\\* version *\\/ *\/ */
+/* /\* #elif __BYTE_ORDER == __BIG_ENDIAN *\/ */
+/* /\*     unsigned int ip_v:4;		/\\* version *\\/ *\/ */
+/* /\*     unsigned int ip_hl:4;		/\\* header length *\\/ *\/ */
+/* /\* #else *\/ */
+/* /\* #error "Byte ordering ot specified "  *\/ */
+/* /\* #endif  *\/ */
+/* /\*     uint8_t ip_tos;			/\\* type of service *\\/ *\/ */
+/* /\*     uint16_t ip_len;			/\\* total length *\\/ *\/ */
+/* /\*     uint16_t ip_id;			/\\* identification *\\/ *\/ */
+/* /\*     uint16_t ip_off;			/\\* fragment offset field *\\/ *\/ */
+/* /\* #define	IP_RF 0x8000			/\\* reserved fragment flag *\\/ *\/ */
+/* /\* #define	IP_DF 0x4000			/\\* dont fragment flag *\\/ *\/ */
+/* /\* #define	IP_MF 0x2000			/\\* more fragments flag *\\/ *\/ */
+/* /\* #define	IP_OFFMASK 0x1fff		/\\* mask for fragmenting bits *\\/ *\/ */
+/* /\*     uint8_t ip_ttl;			/\\* time to live *\\/ *\/ */
+/* /\*     uint8_t ip_p;			/\\* protocol *\\/ *\/ */
+/* /\*     uint16_t ip_sum;			/\\* checksum *\\/ *\/ */
+/* /\*     uint32_t ip_src, ip_dst;	/\\* source and dest address *\\/ *\/ */
+/* /\*   } __attribute__ ((packed)) ; *\/ */
+/* /\* typedef struct sr_ip_hdr sr_ip_hdr_t; *\/ */
+
+/* sr_ip_hdr_t * sanity_check(char * ip_packet_str, size_t len){ */
+
+/*     /\* Sanity-check the packet (meets minimum length and has correct checksum). *\/ */
+/*     /\* uint16_t cksum (const void *_data, int len) *\/ */
+
+/*     sr_ip_hdr_t * ip_header       = (sr_ip_hdr_t *)ip_packet_str;	 */
+/*     unsigned int ip_packet_length = len - sizeof(ether_addr_len); */
+
+/*     if (ip_packet_length < sizeof(sr_ip_hdr_t))  */
+/* 	return NULL; */
+
+/*     if (cksum(ip_packet_str, ip_packet_length) != ip_hdr->ip_sum) */
+/* 	return NULL; */
+	
+
+/*     return ip_header;	 */
+/* } */
+
+/* int longest_match(char * x, char * dest){ */
+/*     int i = 0; */
+/*     while (x[i] == dest[i]) */
+/* 	i++; */
+/*     return i; */
+/* } */
+
+/* sr_rt * find_longest_prefix_match(struct sr_instance * instance, uint32_t dest){ */
+/*     sr_rt * runner        = instance->routing_table,  */
+/*             longest       = NULL; */
+/*     int     longest_match = 0; */
+
+/*     while (runner){ */
+/* 	int current_match_size = longest_match((char *)&runner->dest->s_addr, (char *)&dest); */
+/*         if (longest_match < curent_match_size) */
+/* 	    longest        = runner; */
+/* 	    longest_match  = current_match_size; */
+/* 	} */
+/* 	runner = runner->next; */
+/*     } */
+/*     return longest; */
+/* } */
+
+
+/* /\* function to process arp requests and replies *\/ */
+/* void process_ip_packet(struct sr_instance * instance, char * ip_packet_str, unsigned int len){ */
+/*     sr_ip_hdr_t * ip_header = sanity_check(ip_packet_str, len); */
+/*     if (ip_header) { */
+/* 	if_sr * interface = in_interface_list(instance, ip_header->ip_dst); */
+/* 	/\* if the frame contains an IP packet that is not destined towards one of our interfaces *\/ */
+/* 	if (interface){ */
+
+/* 	    /\* decrement ttl by 1*\/ */
+/* 	    ip_header->ip_ttl--; */
+
+/* 	    /\* recompute packet checksum over modified header *\/ */
+/* 	    ip_header->ip_sum = cksum(ip_packet_str, ip_packet_length); */
+	    
+/* 	    /\* find which entry in the routing table has the longest prefix match with the destination IP address *\/ */
+/* 	    /\* struct sr_rt* routing_table; -- routing table *\/  */
+/* 	    sr_rt * match = find_longest_prefix_match(instance, ip_header->ip_dst); */
+
+
+/* 	} */
+
+	
+/*     } else { */
+/* 	// packet does not pass sanity check, send icmp error? */
+/*     } */
+
+
+/*     /\* if the frame contains an IP packet that is not destined towards one of our interfaces *\/ */
+/*     if (interface == NULL){ */
+/* 	/\* sanity check *\/ */
+
+/*     } */
+
+
+/*       /\* process ip *\/ */
+      
+/*       return; */
+/*   } */
 
 
 
-  /* fill in code here */
-  // Is this an IP Requst?
-     // CASE: ARP Request, Find all packets waiting on this request, update their dest. addr, send them out.
-     // CASE: TCP/UDP packet, drop packet, send back ICMP "HOST UNREACHABLE MESSAGE"
-  // If this is an ICMP ping
-     //If this is a PING (respond appropriately)
-     //If this is a ECHO (respond appropriately)
-  // If this is a 
+
+/*   /\* fill in code here *\/ */
+/*   // Is this an IP Requst? */
+/*      // CASE: ARP Request, Find all packets waiting on this request, update their dest. addr, send them out. */
+/*      // CASE: TCP/UDP packet, drop packet, send back ICMP "HOST UNREACHABLE MESSAGE" */
+/*   // If this is an ICMP ping */
+/*      //If this is a PING (respond appropriately) */
+/*      //If this is a ECHO (respond appropriately) */
+/*   // If this is a  */
 
 
 
 
-}/* end sr_ForwardPacket */
+/* end sr_ForwardPacket */
 
