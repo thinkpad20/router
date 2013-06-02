@@ -45,8 +45,6 @@
 #define IP_MAXPACKET 65535
 #endif
 
-
-
 /* FIXME
  * ohh how lame .. how very, very lame... how can I ever go out in public
  * again?! /mc
@@ -148,8 +146,6 @@ struct sr_ethernet_hdr
 } __attribute__ ((packed)) ;
 typedef struct sr_ethernet_hdr sr_ethernet_hdr_t;
 
-
-
 enum sr_ip_protocol {
   ip_protocol_icmp = 0x0001,
 };
@@ -159,7 +155,6 @@ enum sr_ethertype {
   ethertype_ip = 0x0800,
 };
 
-
 enum sr_arp_opcode {
   arp_op_request = 0x0001,
   arp_op_reply = 0x0002,
@@ -168,7 +163,6 @@ enum sr_arp_opcode {
 enum sr_arp_hrd_fmt {
   arp_hrd_ethernet = 0x0001,
 };
-
 
 struct sr_arp_hdr
 {
