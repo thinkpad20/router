@@ -5,7 +5,6 @@
    are timed out every SR_ARPCACHE_TO seconds.
 
    Pseudocode for use of these structures follows.
-
    --
 
    # When sending packet to next_hop_ip

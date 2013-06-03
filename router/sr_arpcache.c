@@ -11,6 +11,22 @@
 #include "sr_if.h"
 #include "sr_protocol.h"
 
+/* TODO: write a function for handling arp reqs */
+   /* The handle_arpreq() function is a function you should write, and it should */
+   /* handle sending ARP requests if necessary: */
+
+   /* function handle_arpreq(req): */
+   /*     if difftime(now, req->sent) > 1.0 */
+   /*         if req->times_sent >= 5: */
+   /*             send icmp host unreachable to source addr of all pkts waiting */
+   /*               on this request */
+   /*             arpreq_destroy(req) */
+   /*         else: */
+   /*             send arp request */
+   /*             req->sent = now */
+   /*             req->times_sent++ */
+
+
 /* 
   This function gets called every second. For each request sent out, we keep
   checking whether we should resend an request or destroy the arp request.
@@ -69,6 +85,7 @@ struct sr_arpreq *sr_arpcache_queuereq(struct sr_arpcache *cache,
         }
     }
     
+
     /* If the IP wasn't found, add it */
     if (!req) {
         req = (struct sr_arpreq *) calloc(1, sizeof(struct sr_arpreq));
@@ -197,6 +214,7 @@ void sr_arpcache_dump(struct sr_arpcache *cache) {
 
 /* Initialize table + table lock. Returns 0 on success. */
 int sr_arpcache_init(struct sr_arpcache *cache) {  
+
     /* Seed RNG to kick out a random entry if all entries full. */
     srand(time(NULL));
     

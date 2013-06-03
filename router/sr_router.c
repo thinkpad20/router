@@ -33,12 +33,13 @@
  *---------------------------------------------------------------------*/
 
 /* typedefs */
+typedef struct sr_it sr_it;
 typedef struct sr_if sr_if;
 typedef struct sr_instance sr_instance_t;
 
 /* prototype */
 void process_arp(sr_instance_t *, uint8_t *, int, int);
-void process_ip_packet(sr_instance_t *, char *, unsigned int);
+void process_ip_packet(sr_instance_t *, uint8_t *, unsigned int);
 sr_if * get_interface_by_ip(sr_instance_t *, uint32_t);
 void handle_arp_request(sr_instance_t *,  sr_arp_hdr_t *, int, uint8_t *);
 int is_icmp(uint8_t * packet, int len);
@@ -144,18 +145,9 @@ void sr_handlepacket(struct sr_instance* sr,
         /* if passes process */
         printf("processing arp packet\n");
 	process_arp(sr, packet, len, min_length); 
-
     	break;
     case ethertype_ip:
-
-        /* sanity check on ip packet */
-
-        if (is_icmp(packet, len)){
-            printf("this is an icmp\n");
-        } else {
-            printf("this is not an icmp packet\n");
-            /*            process_ip_packet(sr, packet, len); */
-        }
+        process_ip_packet(sr, packet, len);
     	break;
     default: /* if unknow, this is an error, send ICMP of 'unreachable' */
     	break;
@@ -345,83 +337,185 @@ void process_arp(struct sr_instance * sr, uint8_t * packet, int packet_len, int 
 /* /\*   } __attribute__ ((packed)) ; *\/ */
 /* /\* typedef struct sr_ip_hdr sr_ip_hdr_t; *\/ */
 
-/* sr_ip_hdr_t * sanity_check(char * ip_packet_str, size_t len){ */
+sr_ip_hdr_t * sanity_check(uint8_t * packet, size_t len){
 
-/*     /\* Sanity-check the packet (meets minimum length and has correct checksum). *\/ */
-/*     /\* uint16_t cksum (const void *_data, int len) *\/ */
+    /* Sanity-check the packet (meets minimum length and has correct checksum). */
+    /* uint16_t cksum (const void *_data, int len) */
 
-/*     sr_ip_hdr_t * ip_header       = (sr_ip_hdr_t *)ip_packet_str;	 */
-/*     unsigned int ip_packet_length = len - sizeof(ether_addr_len); */
+    printf("performin sanity check\n");
 
-/*     if (ip_packet_length < sizeof(sr_ip_hdr_t))  */
-/* 	return NULL; */
+    sr_ip_hdr_t * ip_header       = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+    size_t eth_size = sizeof(sr_ethernet_hdr_t);
+    unsigned int ip_packet_length = sizeof(sr_ip_hdr_t);
 
-/*     if (cksum(ip_packet_str, ip_packet_length) != ip_hdr->ip_sum) */
-/* 	return NULL; */
-	
+    printf("ip packet len: %d, sizeof(sr_ip_hdr_t): %lu\n", ip_packet_length, sizeof(sr_ip_hdr_t));
 
-/*     return ip_header;	 */
-/* } */
+    uint16_t temp = ip_header->ip_sum;
+    ip_header->ip_sum = 0;
 
-/* int longest_match(char * x, char * dest){ */
-/*     int i = 0; */
-/*     while (x[i] == dest[i]) */
-/* 	i++; */
-/*     return i; */
-/* } */
+    if (ip_packet_length < sizeof(sr_ip_hdr_t)) {
+        printf("length failure\n");
+	return NULL;
+    }
 
-/* sr_rt * find_longest_prefix_match(struct sr_instance * instance, uint32_t dest){ */
-/*     sr_rt * runner        = instance->routing_table,  */
-/*             longest       = NULL; */
-/*     int     longest_match = 0; */
+    printf("ip packet cksum: %d, ip_header->ip_sum: %d\n", 
+           cksum(packet + eth_size, ip_packet_length), temp);
 
-/*     while (runner){ */
-/* 	int current_match_size = longest_match((char *)&runner->dest->s_addr, (char *)&dest); */
-/*         if (longest_match < curent_match_size) */
-/* 	    longest        = runner; */
-/* 	    longest_match  = current_match_size; */
-/* 	} */
-/* 	runner = runner->next; */
-/*     } */
-/*     return longest; */
-/* } */
+    if (cksum(packet + eth_size, ip_packet_length) != temp){
+        printf("cksum is false\n");
+	return NULL;
+    }
 
+    return ip_header;
+}
+
+int longest_match(char * x, char * dest){
+    int i = 0;
+    while (x[i] == dest[i])
+        i++;
+    return i;
+}
+
+struct sr_rt * find_longest_prefix_match(sr_instance_t * instance, uint32_t dest){
+    struct sr_rt * runner        = instance->routing_table,
+                 * longest       = NULL;
+    int     long_match = 0,
+    current_match_size = 0;
+
+    while (runner){
+	current_match_size = longest_match((char *)&runner->dest.s_addr, (char *)&dest);
+        if (long_match < current_match_size){
+	    longest        = runner;
+	    long_match  = current_match_size;
+        }
+	runner = runner->next;
+    }
+    return longest;
+}
 
 /* function to process ip requests and replies */
-void process_ip_packet(struct sr_instance * instance, char * ip_packet_str, unsigned int len){
-    sr_ip_hdr_t * ip_header = sanity_check(ip_packet_str, len);
-    if (ip_header) {
-	if_sr * interface = in_foreign_interface_list(instance, ip_header->ip_dst);
-        /* if the frame contains an IP packet that is not destined towards one of our interfaces */
-	if (interface){
+void process_ip_packet(struct sr_instance * sr, 
+                       uint8_t * eth_packet, 
+                       unsigned int len){
 
+    sr_ip_hdr_t * ip_header = sanity_check(eth_packet, len); 
+    size_t         eth_size = sizeof(sr_ethernet_hdr_t);
+    print_hdr_ip(eth_packet+eth_size);
+
+    /* passes sanity check */
+    if (ip_header) {
+
+	sr_if * interface = get_foreign_interface_by_ip(sr, ip_header->ip_dst);
+
+        /* if the frame contains an IP packet that is not 
+           destined towards one of our interfaces */        
+
+	if (interface){
+            
 	    /* decrement ttl by 1*/
 	    ip_header->ip_ttl--;
 
+            printf("calculating new checksum\n");
+
 	    /* recompute packet checksum over modified header */
-	    ip_header->ip_sum = cksum(ip_packet_str, ip_packet_length);
+	    ip_header->ip_sum = 
+                cksum(eth_packet+eth_size, sizeof(sr_ip_hdr_t));
 	    
-	    /* find which entry in the routing table has the longest prefix match with the destination IP address */
+            /* find which entry in the routing table has the longest 
+               prefix match with the destination IP address */
+            
 	    /* struct sr_rt* routing_table; -- routing table */
-	    sr_rt * match = find_longest_prefix_match(instance, ip_header->ip_dst);
+	    struct sr_rt * match = find_longest_prefix_match(sr, ip_header->ip_dst);
+
+            printf("found match\n");
+
+            sr_print_routing_entry(match);
+
+            /* forward packet ip packet */
+            printf("forward packet here\n");
+
+            /*Check the ARP cache for the next-hop MAC 
+              address corresponding to the next-hop IP */                 
+
+            sr_arpcache_dump(&sr->cache);
+
+            struct sr_arpentry * entry = 
+                sr_arpcache_lookup(&sr->cache, match->dest.s_addr);
+
+            printf("does entry exist?\n");
+
+            if (entry) {
+
+                /* send packet with next hop mapping */
+                sr_ethernet_hdr_t * eth_header = (sr_ethernet_hdr_t *)eth_packet;
+
+                memcpy(eth_header->ether_dhost,entry->mac, ETHER_ADDR_LEN);
+
+                printf("printing headers before send\n");
+
+                print_hdrs(eth_packet, len);
+
+                sr_send_packet(sr, eth_packet, len, interface->name);
+
+                free(entry);
+
+            } else {
+                printf("entry is null\n");
+
+                /* generate and send an ARP request, then free it */
+                
+                /* add to queue of reqs, free packet? */
+                /* struct arp_req * req = sr_arpcache_queuereq(sr->cache, */
+                /*                      match->dest.s_addr, */
+                /*                      eth_packet, */
+                /*                      len - eth_size, */
+                /*                      interface->name); */
 
 
-	}
+                /* warp in eth packet and send */
+
+                /* uint8_t new_packet = malloc(sizeof(sr_ethernet_hdr_t) +  */
+                /*                             sizeof(sr_arp_hdr_t)); */
+
+                /* handle_arpreq(req); */
+
+                /* free(arp_req); */
+            }
+
+   /* if entry: */
+   /*     use next_hop_ip->mac mapping in entry to send the packet */
+   /*     free entry */
+   /* else: */
+   /*     req = arpcache_queuereq(next_hop_ip, packet, len) */
+   /*     handle_arpreq(req) */
+
+
+
+            /*If it's there, send it*/
+
+            /*Otherwise, send an ARP request for the next-hop IP (if
+              one hasn't been sent within the last second), and add
+              the packet to the queue of packets waiting on this ARP request.*/
+
+            /*            sr_send_packet(sr, new_packet, size,
+                          interface->name); */
+
+	} else {
+
+            /* is it a router address? */
+            printf("couldn't find interface to send to\n");
+        }
 
 	
     } else {
-	// packet does not pass sanity check, send icmp error?
+	/* packet does not pass sanity check, send icmp error? */
+        printf("failed sanity check\n");
     }
 
+    
 
     /* if the frame contains an IP packet that is not destined towards one of our interfaces */
-    if (interface == NULL){
-	/* sanity check */
-
-    }
-
       /* process ip */
-      
       return;
   }
 
