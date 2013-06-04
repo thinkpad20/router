@@ -77,6 +77,20 @@
 
 /* Structure of a ICMP header
  */
+enum icmp_code {
+    echo_reply = 0,
+    time_exceeded = 0,
+    dest_unreachable = 0,
+    dest_host_unreachable = 1,
+    port_unreachable = 3,
+};
+
+enum icmp_type {
+    echo_type = 0,
+    unreachable_type = 3,
+    exceeded_type = 11,
+};
+
 struct sr_icmp_hdr {
   uint8_t icmp_type;
   uint8_t icmp_code;
@@ -84,7 +98,6 @@ struct sr_icmp_hdr {
   
 } __attribute__ ((packed)) ;
 typedef struct sr_icmp_hdr sr_icmp_hdr_t;
-
 
 /* Structure of a type3 ICMP header
  */
@@ -145,6 +158,10 @@ typedef struct sr_ethernet_hdr sr_ethernet_hdr_t;
 
 enum sr_ip_protocol {
   ip_protocol_icmp = 0x0001,
+
+  /* added these for convenience */
+  ip_protocol_tcp = 0x0008,
+  ip_protocol_udp = 0x0011,
 };
 
 enum sr_ethertype {
@@ -176,5 +193,7 @@ struct sr_arp_hdr
 typedef struct sr_arp_hdr sr_arp_hdr_t;
 
 #define sr_IFACE_NAMELEN 32
+
+
 
 #endif /* -- SR_PROTOCOL_H -- */
