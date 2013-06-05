@@ -13,7 +13,7 @@ int longest_match(char * x, char * dest){
     return i;
 }
 
-struct sr_rt * find_longest_prefix_match(sr_instance_t * instance, uint32_t dest){
+struct sr_rt * find_longest_prefix_match(struct sr_instance * instance, uint32_t dest){
     struct sr_rt * runner        = instance->routing_table,
                  * longest       = NULL;
     int     long_match = 0,

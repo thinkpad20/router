@@ -1,5 +1,5 @@
-
 #include "sr_ip.h"
+
 
 int is_udp_or_tcp(uint8_t * packet, int len){
     uint8_t ip_proto = ip_protocol(packet + sizeof(sr_ethernet_hdr_t));
@@ -19,18 +19,18 @@ void process_ip_packet(struct sr_instance * sr,
 
     /* passes sanity check */
     if (ip_header) {
-	sr_if * interface = get_foreign_interface_by_ip(sr, ip_header->ip_dst);
-	if (interface){
-	    ip_header->ip_ttl--; /* decr ttl */
+	      struct sr_if *interface = get_foreign_interface_by_ip(sr, ip_header->ip_dst);
+	      if (interface){
+	          ip_header->ip_ttl--; /* decr ttl */
             printf("calculating new checksum\n");
 
-	    /* recompute packet checksum over modified header */
-	    ip_header->ip_sum = cksum(eth_packet+eth_size, sizeof(sr_ip_hdr_t));
+      	    /* recompute packet checksum over modified header */
+      	    ip_header->ip_sum = cksum(eth_packet+eth_size, sizeof(sr_ip_hdr_t));
 	    
             /* find which entry in the routing table has the longest 
                prefix match with the destination IP address */
             
-	    struct sr_rt * match = find_longest_prefix_match(sr, ip_header->ip_dst);
+	          struct sr_rt * match = find_longest_prefix_match(sr, ip_header->ip_dst);
 
             printf("found match\n");
 
@@ -70,23 +70,23 @@ void process_ip_packet(struct sr_instance * sr,
 
             } else {
            
-               printf("entry is null\n");
+                printf("entry is null\n");
 
-/*   else:
-       req = arpcache_queuereq(next_hop_ip, packet, len)
-       handle_arpreq(req)
-*/
-               struct sr_ip_hdr_t * ip_hdr = 
+                /*   else:
+                       req = arpcache_queuereq(next_hop_ip, packet, len)
+                       handle_arpreq(req)
+                */
+                /*sr_ip_hdr_t * ip_hdr = 
                    (sr_ip_hdr_t *)(eth_header + (sizeof(sr_ethernet_hdr_t)));
 
-                   struct arq_req * req = arpcache_queuereq(ip_hdr->ip_dst,
-                                               packet, 
-                                               len);
+                struct sr_arpreq *req = sr_arpcache_queuereq(&sr->cache, 
+                                                             ip_hdr->ip_dst, 
+                                                             eth_packet, 
+                                                             len);*/
            
                 
 
-                /*                generate and send an ARP request,
-                                  then free it */
+                /* generate and send an ARP request, then free it */
                 
                 /*add to queue of reqs, free packet?*/
 
@@ -126,7 +126,7 @@ void process_ip_packet(struct sr_instance * sr,
 	} else {
 
             /* is it a router address? */
-            sr_if * interface = get_router_interface_by_ip(sr, ip_header->ip_dst);
+            struct sr_if * interface = get_router_interface_by_ip(sr, ip_header->ip_dst);
             
             if (interface){
 
@@ -134,13 +134,13 @@ void process_ip_packet(struct sr_instance * sr,
                is valid, send an ICMP echo reply to the sending host. */
                 if (is_icmp(eth_packet, len) && is_icmp_cksum_valid(eth_packet,len)) {
                     printf("icmp message w/ valid cksum to one of our interfaces\n");
-                    send_icmp(echo_type, echo_reply, eth_packet, len);
+                    /*send_icmp(echo_type, echo_reply, eth_packet, len);*/
                 }
 
                 /* If the packet contains a TCP or UDP payload, send an
                    ICMP port unreachable to the sending host. */
-                if (is_udp_or_tcp(eth_packet, len)) 
-                    send_icmp(unreachable_type, port_unreachable, eth_packet, len);
+                if (is_udp_or_tcp(eth_packet, len)) {}
+                    /*send_icmp(unreachable_type, port_unreachable, eth_packet, len);*/
 
                 /* Otherwise, ignore the packet. */
 

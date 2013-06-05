@@ -22,11 +22,6 @@
 #include "sr_protocol.h"
 #include "sr_arpcache.h"
 
-/* protocols */
-typedef struct sr_it sr_it;
-typedef struct sr_if sr_if;
-typedef struct sr_instance sr_instance_t;
-
 /* we dont like this debug , but what to do for varargs ? */
 #ifdef _DEBUG_
 #define Debug(x, args...) printf(x, ## args)

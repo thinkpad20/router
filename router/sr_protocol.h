@@ -78,11 +78,9 @@
 /* Structure of a ICMP header
  */
 enum icmp_code {
-    echo_reply = 0,
-    time_exceeded = 0,
-    dest_unreachable = 0,
-    dest_host_unreachable = 1,
-    port_unreachable = 3,
+    net_code = 0,
+    host_code = 1,
+    port_code = 3,
 };
 
 enum icmp_type {
