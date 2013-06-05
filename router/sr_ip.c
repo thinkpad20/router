@@ -23,16 +23,20 @@ void process_ip_packet(struct sr_instance * sr,
     /* check if this packet is destined for us */
     struct sr_if * interface = get_router_interface_by_ip(sr, ip_header->ip_dst);
     if (interface) {
+
         /* If the packet is an ICMP echo request and its checksum
-           is valid, send an ICMP echo reply to the sending host. */
-        if (is_icmp(eth_packet, len) && is_icmp_cksum_valid(eth_packet,len)) {
-            printf("icmp message w/ valid cksum to one of our interfaces\n");
-            /*send_icmp(echo_type, echo_reply, eth_packet, len);*/
-        }
+        /*    is valid, send an ICMP echo reply to the sending host. *\/ */
+        /* if (is_icmp(eth_packet, len) && is_icmp_cksum_valid(eth_packet,len)) { */
+        /*     printf("icmp message w/ valid cksum to one of our interfaces\n"); */
+        /*     /\*send_icmp(echo_type, echo_reply, eth_packet, len);*\/ */
+        /* } */
 
         /* If the packet contains a TCP or UDP payload, send an
            ICMP port unreachable to the sending host. */
-        if (is_udp_or_tcp(eth_packet, len)) {}
+
+        if (is_udp_or_tcp(eth_packet, len)) {
+            send_icmp_port_unreachable(sr, eth_packet, interface);
+        }
             /*send_icmp(unreachable_type, port_unreachable, eth_packet, len);*/
 
         /* Otherwise, ignore the packet. */
