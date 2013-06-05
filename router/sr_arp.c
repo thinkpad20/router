@@ -151,6 +151,31 @@ void send_arp_req(struct sr_instance *sr, uint32_t ip, struct sr_if *iface) {
     sr_send_packet(sr, new_packet, size, iface->name);
 }
 
-void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req) {
+int handle_arp_req(struct sr_instance *sr, struct sr_arpreq *req, struct sr_if *iface) {
+    time_t now; time(&now);
+    if (iface) {
+        send_arp_req(sr, req->ip, iface);
+        return 0;
+    }
 
+    /* otherwise, we're dealing with old packets */
+    if (now - req->sent < 1) 
+        return 0; /* do nothing if less than 1s has passed */
+
+    if (req->times_sent > 4) {
+        /* send ICMP host unreachable to all waiting */
+        /* note that iface is just the first iface in the list */
+        struct sr_packet *packet = req->packets;
+        while (packet) {
+            send_icmp_host_unreachable(sr, packet);
+        }
+        /* destroy arp req */
+        return 1;
+    } else {
+        send_arp_req(sr, req->ip, find_longest_prefix_match_interface(sr, req->ip));
+        /* update sent time and times_sent */
+        time(&req->sent);
+        req->times_sent++;
+        return 0;
+    }
 }

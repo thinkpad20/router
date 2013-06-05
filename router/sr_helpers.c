@@ -13,19 +13,37 @@ int longest_match(char * x, char * dest){
     return i;
 }
 
+struct sr_if *find_longest_prefix_match_interface(struct sr_instance * instance, 
+                                                  uint32_t dest) {
+    struct sr_if * runner          = instance->if_list,                                                                                                         
+                 * longest         = NULL;                                                                                                                      
+    size_t  long_match             = 0,                                                                                                                                   
+            current_match_size     = 0;                                                                                                                                   
+                                                                                                                                                             
+    while (runner) {                                                                                                                                           
+        current_match_size = longest_match((char *)&runner->ip, (char *)&dest);                                                                               
+        if (long_match < current_match_size){                                                                                                                 
+            longest        = runner;                                                                                                                          
+            long_match  = current_match_size;                                                                                                                 
+        }                                                                                                                                                     
+        runner = runner->next;
+    }
+    return longest;
+}
+
 struct sr_rt * find_longest_prefix_match(struct sr_instance * instance, uint32_t dest){
     struct sr_rt * runner        = instance->routing_table,
                  * longest       = NULL;
     int     long_match = 0,
     current_match_size = 0;
 
-    while (runner){
-	current_match_size = longest_match((char *)&runner->dest.s_addr, (char *)&dest);
-        if (long_match < current_match_size){
-	    longest        = runner;
-	    long_match  = current_match_size;
+    while (runner) {
+    	current_match_size = longest_match((char *)&runner->dest.s_addr, (char *)&dest);
+        if (long_match < current_match_size) {
+    	    longest        = runner;
+    	    long_match     = current_match_size;
         }
-	runner = runner->next;
+    	runner = runner->next;
     }
     return longest;
 }
@@ -40,7 +58,7 @@ struct sr_if * get_foreign_interface_by_ip(struct sr_instance * sr, uint32_t tip
 	if (runner->dest.s_addr == tip) {
             printf("found a matching entry in the routing table\n"
                    "entry interface is %s\n", runner->interface);
-	    return sr_get_interface(sr, runner->interface);
+	        return sr_get_interface(sr, runner->interface);
         }
         runner = runner->next;
     }

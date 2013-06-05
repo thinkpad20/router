@@ -8,8 +8,10 @@
 
 /* forward declare */
 struct sr_instance;
-/* protocols */
 
+/* protocols */
+struct sr_if *find_longest_prefix_match_interface(struct sr_instance * instance, 
+                                                  uint32_t dest);
 int check_eth_packet(int len, int min_length);
 struct sr_rt * find_longest_prefix_match(struct sr_instance * instance, uint32_t dest);
 int longest_match(char * x, char * dest);
