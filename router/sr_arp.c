@@ -1,6 +1,7 @@
 
 #include "sr_arp.h"
 #include "sr_protocol.h"
+#include <assert.h>
 
 /* function to process arp requests and replies */
 void process_arp(struct sr_instance * sr, 
@@ -48,10 +49,11 @@ void handle_arp_reply(struct sr_instance *sr, sr_arp_hdr_t *arp_packet, struct s
         printf("found a packet waiting for this ARP info, sending it "
                "on interface %s\n", packet->iface);
         struct sr_if *iface = sr_get_interface(sr, packet->iface);
-        if (iface)
-            sr_print_if(iface);
-        else
-            printf("interface wasn't found\n");
+
+        assert(iface && "Interface should definitely be found!");
+
+        memcpy(eth_header->ether_shost, iface->addr, ETHER_ADDR_LEN);
+        
         print_hdr_eth(packet->buf);
         sr_send_packet(sr, packet->buf, packet->len, packet->iface);
         packet = packet->next;
