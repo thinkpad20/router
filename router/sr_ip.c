@@ -85,7 +85,9 @@ void process_ip_packet(struct sr_instance * sr,
 
         sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(eth_packet + (sizeof(sr_ethernet_hdr_t)));
 
-        printf("IP to search for: %u,\n", ip_hdr->ip_dst);
+        printf("IP to search for: %u, queuing this on interface %s\n", ip_hdr->ip_dst, 
+                                                                      interface->name);
+        sr_print_if(interface);
 
         /* create an arp request and add it to the queue */
         struct sr_arpreq *req = sr_arpcache_queuereq(&sr->cache, 
