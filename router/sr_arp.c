@@ -45,7 +45,13 @@ void handle_arp_reply(struct sr_instance *sr, sr_arp_hdr_t *arp_packet, struct s
     while (packet) {
         sr_ethernet_hdr_t *eth_header = (sr_ethernet_hdr_t *)packet->buf;
         memcpy(eth_header->ether_dhost, arp_packet->ar_sha, ETHER_ADDR_LEN);
-        printf("found a packet waiting for this ARP info, sending it");
+        printf("found a packet waiting for this ARP info, sending it "
+               "on interface %s\n", packet->iface);
+        struct sr_if *iface = sr_get_interface(sr, packet->iface);
+        if (iface)
+            sr_print_if(iface);
+        else
+            printf("interface wasn't found\n");
         print_hdr_eth(packet->buf);
         sr_send_packet(sr, packet->buf, packet->len, packet->iface);
         packet = packet->next;
