@@ -142,6 +142,7 @@ typedef struct sr_ip_hdr sr_ip_hdr_t;
 
 /* 
  *  Ethernet packet header prototype.  Too many O/S's define this differently.
+
  *  Easy enough to solve that and define it here.
  */
 struct sr_ethernet_hdr
