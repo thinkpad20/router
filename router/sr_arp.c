@@ -139,7 +139,7 @@ void send_arp_req(struct sr_instance *sr, uint32_t ip, struct sr_if *iface) {
     /* set the target IP to input IP */
     arp_header->ar_tip = ip; /* note: already in network byte order */
     /* set the source IP to this interface's */
-    arp_header->ar_sip = htons(iface->ip);
+    arp_header->ar_sip = iface->ip;
 
     /* misc other values */
     arp_header->ar_op = htons(arp_op_request);
@@ -148,30 +148,41 @@ void send_arp_req(struct sr_instance *sr, uint32_t ip, struct sr_if *iface) {
     arp_header->ar_pro = htons(0x0800);
 
     /* and, ship it! */
+    printf("printing arp req new packet deets\n");
+    print_hdr_eth(new_packet);
+    print_hdr_arp(new_packet + (sizeof(sr_ethernet_hdr_t)));
+    
+    printf("shippin new arp req\n");
     sr_send_packet(sr, new_packet, size, iface->name);
 }
 
 int handle_arp_req(struct sr_instance *sr, struct sr_arpreq *req, struct sr_if *iface) {
     time_t now; time(&now);
+
     if (iface) {
+        printf("new arp req, sending immediately\n");
         send_arp_req(sr, req->ip, iface);
         return 0;
     }
 
     /* otherwise, we're dealing with old packets */
     if (now - req->sent < 1) 
+        printf("now - req->sent < 1\n");
         return 0; /* do nothing if less than 1s has passed */
 
     if (req->times_sent > 4) {
+        printf("req->times_sent > 4\n");
         /* send ICMP host unreachable to all waiting */
         /* note that iface is just the first iface in the list */
         struct sr_packet *packet = req->packets;
         while (packet) {
             send_icmp_host_unreachable(sr, packet);
+            packet = packet->next;
         }
         /* destroy arp req */
         return 1;
     } else {
+        printf("req->times_sent < 5, send arp req\n");                    
         send_arp_req(sr, req->ip, find_longest_prefix_match_interface(sr, req->ip));
         /* update sent time and times_sent */
         time(&req->sent);

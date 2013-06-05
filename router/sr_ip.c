@@ -83,8 +83,11 @@ void process_ip_packet(struct sr_instance * sr,
         /* mac address was not found in our lookup table */
         printf("entry is null\n");
 
-        sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(eth_header 
-                                    + (sizeof(sr_ethernet_hdr_t)));
+        sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(eth_header + (sizeof(sr_ethernet_hdr_t)));
+
+        printf("got ip hdr\n");
+
+        printf("ip: %u,\n", ip_hdr->ip_dst);
 
         /* create an arp request and add it to the queue */
         struct sr_arpreq *req = sr_arpcache_queuereq(&sr->cache, 
@@ -92,8 +95,12 @@ void process_ip_packet(struct sr_instance * sr,
                                                      eth_packet, 
                                                      len,
                                                      interface->name);
+
+        
+        printf("got arp request, ip: %u\n", req->ip);
         /* calling handle_arp_req with a non-null interface will cause it
            to send the request immediately */
+
         handle_arp_req(sr, req, interface);
     }
 }
