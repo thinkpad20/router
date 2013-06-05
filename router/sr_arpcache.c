@@ -34,10 +34,38 @@
   See the comments in the header file for an idea of what it should look like.
 */
 void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
-    struct sr_arpreq *req = sr->cache.requests;
+    struct sr_arpreq *req = sr->cache.requests, *temp;
     while (req) {
-        handle_arpreq(sr, req);
+        time_t now; time(&now);
+        int delete = 0;
+        if (now - req->sent < 1) 
+            return; /* do nothing if less than 1s has passed */
+        if (req->times_sent > 4) {
+            /* send ICMP host unreachable to all waiting */
+            /* note that iface is just the first iface in the list */
+            struct sr_packet *packet = req->packets;
+            while (packet) {
+                send_icmp_host_unreachable(sr, packet);
+            }
+            /* destroy arp req */
+            delete = 1;
+        } else {
+            /* resend ARP message to all interfaces */
+            struct sr_if *iface = sr->if_list;
+            while (iface) { 
+                send_arp_req(sr, req->ip, iface);
+                iface = iface->next;
+            }
+            /* update sent time and times_sent */
+            time(&req->sent);
+            req->times_sent++;
+        }
+
+        temp = req;
         req = req->next;
+
+        if (delete) 
+            sr_arpreq_destroy(&sr->cache, temp);
     }
 }
 

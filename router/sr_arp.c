@@ -12,7 +12,7 @@ void process_arp(struct sr_instance * sr, uint8_t * packet, int packet_len, int 
 	    break;
     case arp_op_reply:
         printf("this is an op reply\n");
-        handle_arp_reply(sr, arp_packet);
+        /*handle_arp_reply(sr, arp_packet);*/
 	    break;
     default:
         break;
@@ -152,28 +152,5 @@ void send_arp_req(struct sr_instance *sr, uint32_t ip, struct sr_if *iface) {
 }
 
 void handle_arpreq(struct sr_instance *sr, struct sr_arpreq *req) {
-    time_t now, delta;
-    time(&now);
-    delta = now - req->sent;
-    if (delta < 1) return; /* do nothing if less than 1s has passed */
-    if (req->times_sent > 4) {
-        /* send ICMP host unreachable to all waiting */
-        /* note that iface is just the first iface in the list */
-        struct sr_packet *packet = req->packets;
-        while (packet) {
-            send_icmp_host_unreachable(sr, packet);
-            /*send_icmp(sr, packet, unreachable_type, host_code);*/
-        }
-        /* destroy arp req */
-    } else {
-        /* resend ARP message to all interfaces */
-        struct sr_if *iface = sr->if_list;
-        while (iface) {
-            send_arp_req(sr, req->ip, iface);
-            iface = iface->next;
-        }
-        /* update sent time and times_sent */
-        time(&req->sent);
-        req->times_sent++;
-    }
+
 }

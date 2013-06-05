@@ -18,4 +18,5 @@ void handle_arp_op_request(struct sr_instance *  sr,
                            sr_arp_hdr_t * arp_hdr, 
                            int len, 
                            uint8_t * packet);
+void send_arp_req(struct sr_instance *sr, uint32_t ip, struct sr_if *iface);
 #endif /* -- SR_ARP_H -- */
