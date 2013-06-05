@@ -85,6 +85,7 @@ enum icmp_code {
 
 enum icmp_type {
     echo_type = 0,
+    echo_request = 8,
     unreachable_type = 3,
     exceeded_type = 11,
 };

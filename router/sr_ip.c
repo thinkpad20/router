@@ -19,27 +19,37 @@ void process_ip_packet(struct sr_instance * sr,
 
     /* passes sanity check */
     if (!ip_header) { printf("failed sanity check\n"); return; }
-    
+    printf("passed sanity check..\n");
+
     /* check if this packet is destined for us */
     struct sr_if * interface = get_router_interface_by_ip(sr, ip_header->ip_dst);
-    if (interface) {
 
+    /* interface list */
+    printf("printing interface list\n");
+    sr_print_if_list(sr);
+
+    if (interface) {
+        printf("found interface and printing interface\n");
+        sr_print_if(interface);
+        
         /* If the packet is an ICMP echo request and its checksum
-        /*    is valid, send an ICMP echo reply to the sending host. *\/ */
-        /* if (is_icmp(eth_packet, len) && is_icmp_cksum_valid(eth_packet,len)) { */
-        /*     printf("icmp message w/ valid cksum to one of our interfaces\n"); */
-        /*     /\*send_icmp(echo_type, echo_reply, eth_packet, len);*\/ */
-        /* } */
+           is valid, send an ICMP echo reply to the sending host.  */
+
+        if (is_icmp_echo(eth_packet) && is_icmp_cksum_valid(eth_packet, len)) { 
+            printf("icmp message w/ valid cksum to one of our interfaces\n");
+            send_icmp_echo(sr, eth_packet, interface, len);
+        }
 
         /* If the packet contains a TCP or UDP payload, send an
            ICMP port unreachable to the sending host. */
 
-        if (is_udp_or_tcp(eth_packet, len)) {
+        else if (is_udp_or_tcp(eth_packet, len)) {
             send_icmp_port_unreachable(sr, eth_packet, interface);
         }
-            /*send_icmp(unreachable_type, port_unreachable, eth_packet, len);*/
 
         /* Otherwise, ignore the packet. */
+        else { printf("ignoring packet\n"); }
+
         return;
     }
     
@@ -110,9 +120,6 @@ void process_ip_packet(struct sr_instance * sr,
     }
 }
 
-
-
-
 sr_ip_hdr_t * sanity_check(uint8_t * packet, size_t len){
 
     /* Sanity-check the packet (meets minimum length and has correct checksum). */
@@ -120,13 +127,13 @@ sr_ip_hdr_t * sanity_check(uint8_t * packet, size_t len){
 
     printf("performin sanity check\n");
 
-    sr_ip_hdr_t * ip_header       = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
-    size_t eth_size = sizeof(sr_ethernet_hdr_t);
-    unsigned int ip_packet_length = sizeof(sr_ip_hdr_t);
+    sr_ip_hdr_t * ip_header = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
+    size_t        eth_size = sizeof(sr_ethernet_hdr_t);
+    unsigned int  ip_packet_length = sizeof(sr_ip_hdr_t);
 
     printf("ip packet len: %d, sizeof(sr_ip_hdr_t): %lu\n", ip_packet_length, 
                                                             sizeof(sr_ip_hdr_t));
-
+    
     uint16_t temp = ip_header->ip_sum;
     ip_header->ip_sum = 0;
 
