@@ -27,7 +27,7 @@ void process_arp(struct sr_instance * sr,
     	    break;
         case arp_op_reply:
             printf("we've received an ARP reply\n");
-            handle_arp_reply(sr, req);
+            handle_arp_reply(sr, arp_packet, req);
     	    break;
         default:
             /* we don't support this op code */
@@ -36,13 +36,17 @@ void process_arp(struct sr_instance * sr,
     return;
 }
 
-void handle_arp_reply(struct sr_instance *sr, struct sr_arpreq *req) {
+void handle_arp_reply(struct sr_instance *sr, sr_arp_hdr_t *arp_packet, struct sr_arpreq *req) {
     /* make sure req exists */
     struct sr_packet *packet = (req) ? req->packets : NULL;
 
     /* if packet != NULL, we have some packets waiting to be sent, 
         and now we can send them! */
     while (packet) {
+        sr_ethernet_hdr_t *eth_header = (sr_ethernet_hdr_t *)packet->buf;
+        memcpy(eth_header->ether_dhost, arp_packet->ar_sha, ETHER_ADDR_LEN);
+        printf("found a packet waiting for this ARP info, sending it");
+        print_hdr_eth(packet->buf);
         sr_send_packet(sr, packet->buf, packet->len, packet->iface);
         packet = packet->next;
     }
@@ -174,7 +178,7 @@ void send_arp_req(struct sr_instance *sr, uint32_t ip, struct sr_if *iface) {
     arp_header->ar_hrd = htons(arp_hrd_ethernet);
     arp_header->ar_hln = ETHER_ADDR_LEN; /* single char so no hton */
     arp_header->ar_pro = htons(0x0800);
-    arp_header->ar_pln = 
+    arp_header->ar_pln = 0x04;
 
     /* and, ship it! */
     printf("printing arp req new packet deets\n");
