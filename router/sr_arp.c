@@ -152,7 +152,7 @@ void send_arp_req(struct sr_instance *sr, uint32_t ip, struct sr_if *iface) {
     print_hdr_eth(new_packet);
     print_hdr_arp(new_packet + (sizeof(sr_ethernet_hdr_t)));
     
-    printf("shippin new arp req\n");
+    printf("shippin new arp req to inteface %s\n", iface->name);
     sr_send_packet(sr, new_packet, size, iface->name);
 }
 

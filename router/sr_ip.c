@@ -40,7 +40,7 @@ void process_ip_packet(struct sr_instance * sr,
     }
     
     /* packet is not destined for us. Do we know where to forward it? */
-    printf("couldn't find interface to send to\n");
+    printf("Destination was not one of our interfaces\n");
 
     /* find interface and routing table entry that best match input IP */
     interface = find_longest_prefix_match_interface(sr, ip_header->ip_dst);
@@ -53,7 +53,7 @@ void process_ip_packet(struct sr_instance * sr,
     }
 
     /* OK, so now we get to forward a packet. Yay! */
-    printf("here's the matching routing entry we found:\n");
+    printf("here's the best-matching routing entry we found:\n");
     sr_print_routing_entry(match);
 
     /* set up the ethernet header */
@@ -81,13 +81,11 @@ void process_ip_packet(struct sr_instance * sr,
         free(entry);
     } else {
         /* mac address was not found in our lookup table */
-        printf("entry is null\n");
+        printf("mac address was not found in our lookup table\n");
 
-        sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(eth_header + (sizeof(sr_ethernet_hdr_t)));
+        sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(eth_packet + (sizeof(sr_ethernet_hdr_t)));
 
-        printf("got ip hdr\n");
-
-        printf("ip: %u,\n", ip_hdr->ip_dst);
+        printf("IP to search for: %u,\n", ip_hdr->ip_dst);
 
         /* create an arp request and add it to the queue */
         struct sr_arpreq *req = sr_arpcache_queuereq(&sr->cache, 
@@ -96,8 +94,6 @@ void process_ip_packet(struct sr_instance * sr,
                                                      len,
                                                      interface->name);
 
-        
-        printf("got arp request, ip: %u\n", req->ip);
         /* calling handle_arp_req with a non-null interface will cause it
            to send the request immediately */
 
