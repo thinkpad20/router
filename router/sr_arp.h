@@ -8,7 +8,7 @@
 
 
 /* prototype */
-void handle_arp_reply(struct sr_instance *, sr_arp_hdr_t *);
+void handle_arp_reply(struct sr_instance *sr, struct sr_arpreq *req);
 void sr_arpcache_sweepreqs(struct sr_instance *sr);
 int handle_arp_req(struct sr_instance *sr, struct sr_arpreq *req, struct sr_if *iface);
 void send_arp_reply(struct sr_instance *, struct sr_if *, sr_arp_hdr_t *); 

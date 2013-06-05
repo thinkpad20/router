@@ -3,21 +3,49 @@
 #include "sr_protocol.h"
 
 /* function to process arp requests and replies */
-void process_arp(struct sr_instance * sr, uint8_t * packet, int packet_len, int min_length){
+void process_arp(struct sr_instance * sr, 
+                 uint8_t * packet, 
+                 int packet_len, 
+                 int min_length) {
     sr_arp_hdr_t * arp_packet = (sr_arp_hdr_t *)(packet + min_length);
-    switch (ntohs(arp_packet->ar_op)){
-    case arp_op_request:
-        printf("this is an op request\n");
-	    handle_arp_op_request(sr, arp_packet, packet_len, packet);
-	    break;
-    case arp_op_reply:
-        printf("this is an op reply\n");
-        /*handle_arp_reply(sr, arp_packet);*/
-	    break;
-    default:
-        break;
+    struct sr_if *iface = get_router_interface_by_ip(sr, arp_packet->ar_tip);
+    if (!iface) {
+        /* then packet was not meant for us */
+        return;
+    }
+
+    /* we now have an IP/MAC mapping. We can save ARP requests by adding it 
+        to our cache. If it was already in our cache, we'll now be able
+        to send some data that was waiting. */
+    struct sr_arpreq *req = sr_arpcache_insert(&sr->cache, arp_packet->ar_sha, 
+                                                           arp_packet->ar_sip);
+
+    switch (ntohs(arp_packet->ar_op)) {
+        case arp_op_request:
+            printf("we've received an ARP request\n");
+    	    handle_arp_op_request(sr, arp_packet, packet_len, packet);
+    	    break;
+        case arp_op_reply:
+            printf("we've received an ARP reply\n");
+            handle_arp_reply(sr, req);
+    	    break;
+        default:
+            /* we don't support this op code */
+            break;
     }
     return;
+}
+
+void handle_arp_reply(struct sr_instance *sr, struct sr_arpreq *req) {
+    /* make sure req exists */
+    struct sr_packet *packet = (req) ? req->packets : NULL;
+
+    /* if packet != NULL, we have some packets waiting to be sent, 
+        and now we can send them! */
+    while (packet) {
+        sr_send_packet(sr, packet->buf, packet->len, packet->iface);
+        packet = packet->next;
+    }
 }
 
 
@@ -146,6 +174,7 @@ void send_arp_req(struct sr_instance *sr, uint32_t ip, struct sr_if *iface) {
     arp_header->ar_hrd = htons(arp_hrd_ethernet);
     arp_header->ar_hln = ETHER_ADDR_LEN; /* single char so no hton */
     arp_header->ar_pro = htons(0x0800);
+    arp_header->ar_pln = 
 
     /* and, ship it! */
     printf("printing arp req new packet deets\n");
