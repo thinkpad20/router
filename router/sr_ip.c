@@ -75,6 +75,7 @@ void process_ip_packet(struct sr_instance * sr,
     if (entry) {
        /*use next_hop_ip->mac mapping in entry to send the packet*/
         memcpy(eth_header->ether_dhost, entry->mac, ETHER_ADDR_LEN);
+        memcpy(eth_header->ether_shost, interface->addr, ETHER_ADDR_LEN);
         printf("printing headers before send\n");
         print_hdrs(eth_packet, len);
         sr_send_packet(sr, eth_packet, len, interface->name);
