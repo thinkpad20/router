@@ -37,7 +37,7 @@ void process_ip_packet(struct sr_instance * sr,
 
         if (is_icmp_echo(eth_packet) && is_icmp_cksum_valid(eth_packet, len)) { 
             printf("icmp message w/ valid cksum to one of our interfaces\n");
-            send_icmp_echo(sr, eth_packet, interface, len);
+            send_icmp_echo(sr, eth_packet, interface);
         }
 
         /* If the packet contains a TCP or UDP payload, send an

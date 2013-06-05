@@ -197,7 +197,7 @@ void send_arp_req(struct sr_instance *sr, uint32_t ip, struct sr_if *iface) {
     sr_send_packet(sr, new_packet, size, iface->name);
 }
 
-int handle_arp_req(struct sr_instance *sr, struct sr_arpreq *req, struct sr_if *iface, int len) {
+int handle_arp_req(struct sr_instance *sr, struct sr_arpreq *req, struct sr_if *iface) {
     time_t now; time(&now);
 
     if (iface) {
@@ -217,7 +217,7 @@ int handle_arp_req(struct sr_instance *sr, struct sr_arpreq *req, struct sr_if *
         /* note that iface is just the first iface in the list */
         struct sr_packet *packet = req->packets;
         while (packet) {
-            send_icmp_host_unreachable(sr, packet, len);
+            send_icmp_host_unreachable(sr, packet);
             packet = packet->next;
         }
         /* destroy arp req */

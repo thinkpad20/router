@@ -33,10 +33,10 @@
   checking whether we should resend an request or destroy the arp request.
   See the comments in the header file for an idea of what it should look like.
 */
-void sr_arpcache_sweepreqs(struct sr_instance *sr, int len) { 
+void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
     struct sr_arpreq *req = sr->cache.requests, *temp;
     while (req) {
-        int delete = handle_arp_req(sr, req, NULL, len);
+        int delete = handle_arp_req(sr, req, NULL);
         temp = req;
         req = req->next;
 
