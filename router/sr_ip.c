@@ -24,7 +24,13 @@ void process_ip_packet(struct sr_instance * sr,
 
     /* check if this packet is destined for us */
     struct sr_if * requested_iface = get_router_interface_by_ip(sr, ip_header->ip_dst);
+
     if (requested_iface) {
+
+        /* print if list */
+        printf("printing if list\n");
+        sr_print_if_list(sr);
+
         printf("IP packet destined for us! Interface\n");
         sr_print_if(requested_iface);
         
@@ -129,7 +135,6 @@ sr_ip_hdr_t * sanity_check(uint8_t * packet, size_t len){
 
     printf("ip packet len: %d, sizeof(sr_ip_hdr_t): %lu\n", ip_packet_length, 
                                                             sizeof(sr_ip_hdr_t));
-    
     uint16_t temp = ip_header->ip_sum;
     ip_header->ip_sum = 0;
 

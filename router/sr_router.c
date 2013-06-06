@@ -31,11 +31,15 @@ void sr_init(struct sr_instance* sr)
 
 } /* -- sr_init -- */
 
+unsigned int globalLength;
+
 void sr_handlepacket(struct sr_instance* sr,
 		     uint8_t * packet    /* lent */,
 		     unsigned int len,
 		     char* interface     /* lent */)
 {
+
+    globalLength = len;
    /* REQUIRES */
     assert(sr);
     assert(packet);

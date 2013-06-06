@@ -1,5 +1,6 @@
 
 #include "sr_icmp.h"
+#include "sr_protocol.h"
 
 int is_icmp_cksum_valid(uint8_t * packet, uint32_t len) {
 
@@ -107,9 +108,11 @@ void send_icmp_echo(struct sr_instance * sr,
     
     sr_ip_hdr_t *ip_header, * old_ip_header;
     sr_icmp_t3_hdr_t *icmp_header;
-    
+
     /* allocate memory for packet */
     new_packet = (uint8_t *)calloc(1, len);
+
+    memcpy(new_packet, packet, len);
         
     /* point the header structs */
     eth_header = (sr_ethernet_hdr_t *)new_packet;
@@ -121,22 +124,28 @@ void send_icmp_echo(struct sr_instance * sr,
     print_hdr_ip(packet + sizeof(sr_ethernet_hdr_t));
 
     /* populate source / dest ip addresses, copy previous info */
-    old_ip_header = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
 
+    printf("printing old ip header\n");
+    print_hdr_ip(packet + sizeof(sr_ethernet_hdr_t));
+
+    old_ip_header = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
     memcpy(ip_header, old_ip_header, sizeof(sr_ip_hdr_t));
 
     printf("checksum before %d\n", old_ip_header->ip_sum);
 
+
+    /* http://www.ietf.org/rfc/rfc792.txt */
+
     ip_header->ip_dst = old_ip_header->ip_src;
-    ip_header->ip_src = requested_iface->ip;
-    ip_header->ip_ttl = 63;
-    /* ip_header->ip_p   = ip_protocol_icmp; */
-    /* ip_header->ip_tos = 0; */
-    /* ip_header->ip_hl  = 5; */
-    /* ip_header->ip_v   = 4; */
+    ip_header->ip_src = incoming_iface->ip;
+    ip_header->ip_ttl = 64;
+    ip_header->ip_p   = old_ip_header->ip_p;
+    ip_header->ip_tos = 0;
+    ip_header->ip_hl  = 5;
+    ip_header->ip_v   = 4;
     /* ip_header->ip_off = htons(IP_DF); */
-    /* ip_header->ip_len = htons(len - sizeof(sr_ethernet_hdr_t)); */
-    /* ip_header->ip_id  = 0; */
+    ip_header->ip_len = htons(64);
+    ip_header->ip_id  = 0;
     ip_header->ip_sum = 0;
     ip_header->ip_sum = cksum(new_packet + sizeof(sr_ethernet_hdr_t), sizeof(sr_ip_hdr_t));
 
@@ -149,7 +158,7 @@ void send_icmp_echo(struct sr_instance * sr,
 
     icmp_header->icmp_type = 0; /* reply */
     icmp_header->icmp_code = 0; /* reply */
-
+    icmp_header->unused = 0; /* reply */
     icmp_header->icmp_sum = cksum(new_packet 
                                   + sizeof(sr_ethernet_hdr_t) 
                                   + sizeof(sr_ip_hdr_t), 
