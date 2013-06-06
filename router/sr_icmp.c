@@ -138,7 +138,7 @@ void send_icmp_echo(struct sr_instance * sr,
     /* ip_header->ip_len = htons(len - sizeof(sr_ethernet_hdr_t)); */
     /* ip_header->ip_id  = 0; */
     ip_header->ip_sum = 0;
-    ip_header->ip_sum = cksum(packet + sizeof(sr_ethernet_hdr_t), sizeof(sr_ip_hdr_t));
+    ip_header->ip_sum = cksum(new_packet + sizeof(sr_ethernet_hdr_t), sizeof(sr_ip_hdr_t));
 
     printf("checksum after %d\n", ip_header->ip_sum);
 
