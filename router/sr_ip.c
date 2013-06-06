@@ -14,9 +14,11 @@ void process_ip_packet(struct sr_instance * sr,
                        unsigned int len,
                        struct sr_if *incoming_iface) {
 
+    printf("printing if list\n");
+    sr_print_if_list(sr);
+
     sr_ip_hdr_t * ip_header = sanity_check(eth_packet, len); 
     size_t         eth_size = sizeof(sr_ethernet_hdr_t);
-    print_hdr_ip(eth_packet+eth_size);
 
     /* passes sanity check */
     if (!ip_header) { printf("failed sanity check\n"); return; }
@@ -28,8 +30,6 @@ void process_ip_packet(struct sr_instance * sr,
     if (requested_iface) {
 
         /* print if list */
-        printf("printing if list\n");
-        sr_print_if_list(sr);
 
         printf("IP packet destined for us! Interface\n");
         sr_print_if(requested_iface);
@@ -46,6 +46,14 @@ void process_ip_packet(struct sr_instance * sr,
            ICMP port unreachable to the sending host. */
 
         else if (is_udp_or_tcp(eth_packet, len)) {
+
+            printf("GOT UDP/TCP PAYLOAD\n");
+
+            /*Port unreachable (type 3, code 3) ** Sent if an IP
+              packet containing a UDP or TCP payload is sent to one of
+              the router's interfaces. 
+              This is needed for traceroute to work. */
+
             send_icmp_port_unreachable(sr, eth_packet, requested_iface, incoming_iface);
         }
 
@@ -63,8 +71,14 @@ void process_ip_packet(struct sr_instance * sr,
     struct sr_rt *match = find_longest_prefix_match(sr, ip_header->ip_dst);
 
     /* if this is null, we have absolutely no match, and send an error */
+
     if (!match) {
-        /* send an error here */
+        printf("DESTINATION NET UNREACHABLE\n");
+        /* Destination net unreachable (type 3, code 0) ** Sent if
+        there is a non-existent route to the destination IP (no
+        matching entry in routing table when forwarding an IP packet). */
+
+        send_icmp_net_unreachable(sr,eth_packet, requested_iface, incoming_iface);
         return;
     }
 
@@ -81,6 +95,7 @@ void process_ip_packet(struct sr_instance * sr,
     if (!ip_header->ip_ttl) { /* do something */ return; }
 
     /* recompute packet checksum over modified header */
+    ip_header->ip_sum = 0;
     ip_header->ip_sum = cksum(eth_packet+eth_size, sizeof(sr_ip_hdr_t));
 
     /* Check the ARP cache for the next-hop MAC 
@@ -150,6 +165,8 @@ sr_ip_hdr_t * sanity_check(uint8_t * packet, size_t len){
         printf("cksum is false\n");
 	return NULL;
     }
+
+    ip_header->ip_sum = temp;
 
     return ip_header;
 }
