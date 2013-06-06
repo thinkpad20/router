@@ -92,21 +92,21 @@ void send_icmp_timeout(struct sr_instance * sr,
         free(new_packet);
 }
 
-
 void send_icmp_echo(struct sr_instance * sr, 
                     uint8_t * packet, 
                     struct sr_if *requested_iface,
                     struct sr_if *incoming_iface) {
+
     size_t len = sizeof(sr_ethernet_hdr_t) 
         + sizeof(sr_ip_hdr_t)
-        + sizeof(sr_icmp_hdr_t);
+        + sizeof(sr_icmp_t3_hdr_t);
 
     uint8_t * new_packet;
     sr_ethernet_hdr_t *eth_header, 
         *old_eth_header = (sr_ethernet_hdr_t *)packet;
     
     sr_ip_hdr_t *ip_header, * old_ip_header;
-    sr_icmp_hdr_t *icmp_header;
+    sr_icmp_t3_hdr_t *icmp_header;
     
     /* allocate memory for packet */
     new_packet = (uint8_t *)calloc(1, len);
@@ -114,42 +114,51 @@ void send_icmp_echo(struct sr_instance * sr,
     /* point the header structs */
     eth_header = (sr_ethernet_hdr_t *)new_packet;
     ip_header = (sr_ip_hdr_t *)(new_packet + sizeof(sr_ethernet_hdr_t));
-    icmp_header = (sr_icmp_hdr_t *)
+    icmp_header = (sr_icmp_t3_hdr_t *)
         (new_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+
+    printf("printing old ethernet header\n");
+    print_hdr_ip(packet + sizeof(sr_ethernet_hdr_t));
 
     /* populate source / dest ip addresses, copy previous info */
     old_ip_header = (sr_ip_hdr_t *)(packet + sizeof(sr_ethernet_hdr_t));
 
     memcpy(ip_header, old_ip_header, sizeof(sr_ip_hdr_t));
-    
+
+    printf("checksum before %d\n", old_ip_header->ip_sum);
+
     ip_header->ip_dst = old_ip_header->ip_src;
     ip_header->ip_src = requested_iface->ip;
-    ip_header->ip_ttl = 64;
-    ip_header->ip_p   = ip_protocol_icmp;
-    ip_header->ip_tos = 0;
-    ip_header->ip_hl  = 5;
-    ip_header->ip_v   = 4;
-    ip_header->ip_off = htons(IP_DF);
-    ip_header->ip_len = htons(len - sizeof(sr_ethernet_hdr_t));
-    ip_header->ip_id  = 0;
+    ip_header->ip_ttl = 63;
+    /* ip_header->ip_p   = ip_protocol_icmp; */
+    /* ip_header->ip_tos = 0; */
+    /* ip_header->ip_hl  = 5; */
+    /* ip_header->ip_v   = 4; */
+    /* ip_header->ip_off = htons(IP_DF); */
+    /* ip_header->ip_len = htons(len - sizeof(sr_ethernet_hdr_t)); */
+    /* ip_header->ip_id  = 0; */
     ip_header->ip_sum = 0;
     ip_header->ip_sum = cksum(packet + sizeof(sr_ethernet_hdr_t), sizeof(sr_ip_hdr_t));
 
+    printf("checksum after %d\n", ip_header->ip_sum);
 
     /* populate icmp headers */
     /* http://www.networksorcery.com/enp/protocol/icmp/msg0.htm */
+
+    memcpy(icmp_header, packet + sizeof(sr_ip_hdr_t) + sizeof(sr_ethernet_hdr_t), len - (sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)));
+
     icmp_header->icmp_type = 0; /* reply */
     icmp_header->icmp_code = 0; /* reply */
 
     icmp_header->icmp_sum = cksum(new_packet 
                                   + sizeof(sr_ethernet_hdr_t) 
                                   + sizeof(sr_ip_hdr_t), 
-                                  sizeof(sr_icmp_hdr_t));
+                                  len - (sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)));
     
 	/* set up ethernet frame */
-	eth_header->ether_type = htons(ethertype_ip);
-	memcpy(eth_header->ether_shost, incoming_iface->addr, ETHER_ADDR_LEN);
-	memcpy(eth_header->ether_dhost, old_eth_header->ether_shost, ETHER_ADDR_LEN);
+    eth_header->ether_type = htons(ethertype_ip);
+    memcpy(eth_header->ether_shost, incoming_iface->addr, ETHER_ADDR_LEN);
+    memcpy(eth_header->ether_dhost, old_eth_header->ether_shost, ETHER_ADDR_LEN);
 
     /* print before send */
     print_hdrs(new_packet, 
