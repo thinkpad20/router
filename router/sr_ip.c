@@ -11,7 +11,8 @@ int is_udp_or_tcp(uint8_t * packet, int len){
 /* function to process ip requests and replies */
 void process_ip_packet(struct sr_instance * sr, 
                        uint8_t * eth_packet, 
-                       unsigned int len) {
+                       unsigned int len,
+                       struct sr_if *incoming_iface) {
 
     sr_ip_hdr_t * ip_header = sanity_check(eth_packet, len); 
     size_t         eth_size = sizeof(sr_ethernet_hdr_t);
@@ -22,29 +23,24 @@ void process_ip_packet(struct sr_instance * sr,
     printf("passed sanity check..\n");
 
     /* check if this packet is destined for us */
-    struct sr_if * interface = get_router_interface_by_ip(sr, ip_header->ip_dst);
-
-    /* interface list */
-    printf("printing interface list\n");
-    sr_print_if_list(sr);
-
-    if (interface) {
-        printf("found interface and printing interface\n");
-        sr_print_if(interface);
+    struct sr_if * requested_iface = get_router_interface_by_ip(sr, ip_header->ip_dst);
+    if (requested_iface) {
+        printf("IP packet destined for us! Interface\n");
+        sr_print_if(requested_iface);
         
         /* If the packet is an ICMP echo request and its checksum
            is valid, send an ICMP echo reply to the sending host.  */
 
         if (is_icmp_echo(eth_packet) && is_icmp_cksum_valid(eth_packet, len)) { 
-            printf("icmp message w/ valid cksum to one of our interfaces\n");
-            send_icmp_echo(sr, eth_packet, interface);
+            printf("icmp ECHO message, valid cksum, to one of our interfaces\n");
+            send_icmp_echo(sr, eth_packet, requested_iface, incoming_iface);
         }
 
         /* If the packet contains a TCP or UDP payload, send an
            ICMP port unreachable to the sending host. */
 
         else if (is_udp_or_tcp(eth_packet, len)) {
-            send_icmp_port_unreachable(sr, eth_packet, interface);
+            send_icmp_port_unreachable(sr, eth_packet, requested_iface, incoming_iface);
         }
 
         /* Otherwise, ignore the packet. */
@@ -57,7 +53,7 @@ void process_ip_packet(struct sr_instance * sr,
     printf("Destination was not one of our interfaces\n");
 
     /* find interface and routing table entry that best match input IP */
-    interface = find_longest_prefix_match_interface(sr, ip_header->ip_dst);
+    requested_iface = find_longest_prefix_match_interface(sr, ip_header->ip_dst);
     struct sr_rt *match = find_longest_prefix_match(sr, ip_header->ip_dst);
 
     /* if this is null, we have absolutely no match, and send an error */
@@ -91,10 +87,10 @@ void process_ip_packet(struct sr_instance * sr,
         memcpy(eth_header->ether_dhost, 
                entry->mac, 
                ETHER_ADDR_LEN);
-        memcpy(eth_header->ether_shost, interface->addr, ETHER_ADDR_LEN);
+        memcpy(eth_header->ether_shost, requested_iface->addr, ETHER_ADDR_LEN);
         printf("printing headers before send\n");
         print_hdrs(eth_packet, len);
-        sr_send_packet(sr, eth_packet, len, interface->name);
+        sr_send_packet(sr, eth_packet, len, requested_iface->name);
         free(entry);
     } else {
         /* mac address was not found in our lookup table */
@@ -103,20 +99,20 @@ void process_ip_packet(struct sr_instance * sr,
         sr_ip_hdr_t *ip_hdr = (sr_ip_hdr_t *)(eth_packet + (sizeof(sr_ethernet_hdr_t)));
 
         printf("IP to search for: %u, queuing this on interface %s\n", ip_hdr->ip_dst, 
-                                                                      interface->name);
-        sr_print_if(interface);
+                                                                      requested_iface->name);
+        sr_print_if(requested_iface);
 
         /* create an arp request and add it to the queue */
         struct sr_arpreq *req = sr_arpcache_queuereq(&sr->cache, 
                                                      ip_hdr->ip_dst, 
                                                      eth_packet, 
                                                      len,
-                                                     interface->name);
+                                                     requested_iface->name);
 
         /* calling handle_arp_req with a non-null interface will cause it
            to send the request immediately */
 
-        handle_arp_req(sr, req, interface);
+        send_arp_req(sr, req->ip, incoming_iface);
     }
 }
 

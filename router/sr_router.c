@@ -51,14 +51,16 @@ void sr_handlepacket(struct sr_instance* sr,
     if (!check_eth_packet(len, min_length))
         return;
 
+    struct sr_if *iface = sr_get_interface(sr, interface);
+
     switch (ethertype(packet)){
     case ethertype_arp:
         if (!check_arp_packet(len, min_length)) return;
         printf("processing arp packet\n");
-	process_arp(sr, packet, len, min_length); 
+	    process_arp_packet(sr, packet, len, min_length, iface); 
     	break;
     case ethertype_ip:
-        process_ip_packet(sr, packet, len);
+        process_ip_packet(sr, packet, len, iface);
     	break;
     default: /* if unknow, this is an error, send ICMP of 'unreachable' */
     	break;

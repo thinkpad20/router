@@ -7,7 +7,7 @@
 #include "sr_arpcache.h"
 #include "sr_arp.h"
 
-void process_ip_packet(struct sr_instance *, uint8_t *, unsigned int);
+void process_ip_packet(struct sr_instance *, uint8_t *, unsigned int, struct sr_if *incoming_iface);
 int is_udp_or_tcp(uint8_t * packet, int len);
 sr_ip_hdr_t * sanity_check(uint8_t * packet, size_t len);
 

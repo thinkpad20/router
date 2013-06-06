@@ -36,7 +36,7 @@
 void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
     struct sr_arpreq *req = sr->cache.requests, *temp;
     while (req) {
-        int delete = handle_arp_req(sr, req, NULL);
+        int delete = handle_queued_arp_req(sr, req);
         temp = req;
         req = req->next;
 

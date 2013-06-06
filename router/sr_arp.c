@@ -4,11 +4,13 @@
 #include <assert.h>
 
 /* function to process arp requests and replies */
-void process_arp(struct sr_instance * sr, 
+void process_arp_packet(struct sr_instance * sr, 
                  uint8_t * packet, 
                  int packet_len, 
-                 int min_length) {
+                 int min_length,
+                 struct sr_if *incoming_iface) {
     sr_arp_hdr_t * arp_packet = (sr_arp_hdr_t *)(packet + min_length);
+
     struct sr_if *iface = get_router_interface_by_ip(sr, arp_packet->ar_tip);
     if (!iface) {
         /* then packet was not meant for us */
@@ -24,7 +26,7 @@ void process_arp(struct sr_instance * sr,
     switch (ntohs(arp_packet->ar_op)) {
         case arp_op_request:
             printf("we've received an ARP request\n");
-    	    handle_arp_op_request(sr, arp_packet, packet_len, packet);
+    	    handle_arp_request(sr, arp_packet, packet_len, packet, incoming_iface);
     	    break;
         case arp_op_reply:
             printf("we've received an ARP reply\n");
@@ -62,8 +64,9 @@ void handle_arp_reply(struct sr_instance *sr, sr_arp_hdr_t *arp_packet, struct s
 
 
 void send_arp_reply(struct sr_instance * sr, 
-                    struct sr_if * interface, 
-                    sr_arp_hdr_t * arp_packet){
+                    struct sr_if * requested_interface, 
+                    sr_arp_hdr_t * arp_packet,
+                    struct sr_if *incoming_iface) {
 
     /* send arp packet */
     printf("sending arp packet\n");
@@ -80,8 +83,8 @@ void send_arp_reply(struct sr_instance * sr,
     /* copy source hw addr to eth head dhost */
     memcpy(eth_head->ether_dhost, arp_packet->ar_sha, ETHER_ADDR_LEN);
 
-    /* copy interface mac addr to ether_shost*/
-    memcpy(eth_head->ether_shost, interface->addr, ETHER_ADDR_LEN);
+    /* copy interface mac addr to ether_shost */
+    memcpy(eth_head->ether_shost, incoming_iface->addr, ETHER_ADDR_LEN);
 
     /* set ethernet type to arp req */
     eth_head->ether_type = htons(ethertype_arp);
@@ -99,7 +102,7 @@ void send_arp_reply(struct sr_instance * sr,
     memcpy(arp_head->ar_tha, arp_packet->ar_sha, ETHER_ADDR_LEN);
 
     /* take source hw addr, put into thw addr */
-    memcpy(arp_head->ar_sha, interface->addr, ETHER_ADDR_LEN);
+    memcpy(arp_head->ar_sha, requested_interface->addr, ETHER_ADDR_LEN);
 
     /* set source ip to be target ip */
     arp_head->ar_sip = arp_packet->ar_tip;
@@ -111,25 +114,26 @@ void send_arp_reply(struct sr_instance * sr,
     print_hdr_arp(new_packet + sizeof(sr_ethernet_hdr_t));
 
     /*** send him on his way ***/
-    sr_send_packet(sr, new_packet, size, interface->name);
+    sr_send_packet(sr, new_packet, size, incoming_iface->name);
     printf("sent\n");
     free(new_packet); 
 }
 
-void handle_arp_op_request(struct sr_instance *  sr, 
+void handle_arp_request(struct sr_instance *  sr, 
                            sr_arp_hdr_t * arp_hdr, 
                            int len, 
-                           uint8_t * packet) {
+                           uint8_t * packet,
+                           struct sr_if *incoming_iface) {
     /* In the case of an ARP request, you should only send an ARP reply
        if the target IP address is one of your router's IP addresses. */
     /* ARP replies are sent directly to the requester's MAC address. */
     struct sr_if * interface;
     if ((interface = get_router_interface_by_ip(sr, arp_hdr->ar_tip)) != NULL) {
-        printf("router interface\n");
+        printf("ARP request was for one of our router's interfaces\n");
         sr_print_if(interface);
-        send_arp_reply(sr, interface, arp_hdr);
+        send_arp_reply(sr, interface, arp_hdr, incoming_iface);
     } else if ((interface = get_foreign_interface_by_ip(sr, arp_hdr->ar_tip)) != NULL){
-        printf("foreign interface ignore\n");
+        printf("ARP request was for a foreign interface, ignore\n");
         sr_print_if(interface);        
     }
     else {
@@ -197,19 +201,14 @@ void send_arp_req(struct sr_instance *sr, uint32_t ip, struct sr_if *iface) {
     sr_send_packet(sr, new_packet, size, iface->name);
 }
 
-int handle_arp_req(struct sr_instance *sr, struct sr_arpreq *req, struct sr_if *iface) {
+int handle_queued_arp_req(struct sr_instance *sr, struct sr_arpreq *req) {
     time_t now; time(&now);
 
-    if (iface) {
-        printf("new arp req, sending immediately\n");
-        send_arp_req(sr, req->ip, iface);
-        return 0;
-    }
-
     /* otherwise, we're dealing with old packets */
-    if (now - req->sent < 1) 
+    if (now - req->sent < 1) {
         printf("now - req->sent < 1\n");
         return 0; /* do nothing if less than 1s has passed */
+    }
 
     if (req->times_sent > 4) {
         printf("req->times_sent > 4\n");
