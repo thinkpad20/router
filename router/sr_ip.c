@@ -59,6 +59,7 @@ void process_ip_packet(struct sr_instance * sr,
               This is needed for traceroute to work. */
 
             send_icmp_port_unreachable(sr, eth_packet, requested_iface, incoming_iface);
+            printf("finished sending icmp port unreachable\n");
         }
 
         /* Otherwise, ignore the packet. */
