@@ -283,6 +283,7 @@ void send_icmp_port_unreachable(struct sr_instance *sr,
 
     /* allocate memory for packet */
     new_packet = (uint8_t *)calloc(1, len);
+    assert(new_packet && "Error in allocating new packet");
  
     /* point the header structs */
     eth_header = (sr_ethernet_hdr_t *)new_packet;
@@ -324,7 +325,7 @@ void send_icmp_port_unreachable(struct sr_instance *sr,
     
     /* send */
     sr_send_packet(sr, new_packet, len, incoming_iface->name);  
-    printf("Sent icmp timeout\n"); fflush(stdout);
+    printf("Sent icmp timeout, new_packet is %p\n", new_packet); fflush(stdout);
     free(new_packet);
     printf("freed our allocated packet\n"); fflush(stdout);
 }
