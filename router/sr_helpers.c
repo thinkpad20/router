@@ -68,9 +68,16 @@ struct sr_if * get_foreign_interface_by_ip(struct sr_instance * sr, uint32_t tip
 
 struct sr_if * get_router_interface_by_ip(struct sr_instance * sr, uint32_t tip){
     struct sr_if * runner = sr->if_list;
-    while (runner != NULL){
-        if (runner->ip == tip)
+    char buf[INET_ADDRSTRLEN];
+    printf("Searching for ip %s in our interface list\n", 
+        inet_ntop(AF_INET, &tip, buf, INET_ADDRSTRLEN));
+    while (runner != NULL) {
+        printf("Comparing with interface ip: %s\n", 
+            inet_ntop(AF_INET, &runner->ip, buf, INET_ADDRSTRLEN));
+        if (runner->ip == tip) {
+            printf("match\n");
             return runner;
+        }
         runner = runner->next;
     }
     return NULL;
