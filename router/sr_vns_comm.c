@@ -565,7 +565,7 @@ int sr_send_packet(struct sr_instance* sr /* borrowed */,
 {
     c_packet_header *sr_pkt;
     unsigned int total_len =  len + (sizeof(c_packet_header));
-
+    printf("sr_send_packet called with buf = %p\n", buf);
     /* REQUIRES */
     assert(sr);
     assert(buf);
@@ -573,7 +573,7 @@ int sr_send_packet(struct sr_instance* sr /* borrowed */,
 
     /* don't waste my time ... */
     if ( len < sizeof(struct sr_ethernet_hdr) ){
-        fprintf(stderr , "** Error: packet is wayy too short \n");
+        fprintf(stderr , "** Error: packet is wayy to short \n");
         return -1;
     }
 
@@ -601,6 +601,8 @@ int sr_send_packet(struct sr_instance* sr /* borrowed */,
         free(sr_pkt);
         return -1;
     }
+
+    printf("sr_send_packet about to free sr_pkt, buf = %p, sr_pkt = %p\n", buf, sr_pkt);
 
     free(sr_pkt);
 
