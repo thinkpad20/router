@@ -21,10 +21,10 @@ void send_icmp_port_unreachable(struct sr_instance *sr,
                                 struct sr_if *requested_iface, 
                                 struct sr_if *incoming_iface);
 
-void send_icmp_timeout(struct sr_instance *sr, 
-                       uint8_t * buff, 
-                       struct sr_if *requested_iface,
-                       struct sr_if *incoming_iface);
+void send_icmp_timeout(struct sr_instance * sr, 
+                       uint8_t * packet, 
+                       struct sr_if * requested_iface,
+                       struct sr_if * incoming_iface);
 
 void send_icmp_echo(struct sr_instance *sr, 
 					uint8_t *packet, 

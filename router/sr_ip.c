@@ -24,9 +24,13 @@ void process_ip_packet(struct sr_instance * sr,
     if (!ip_header) { printf("failed sanity check\n"); return; }
     printf("passed sanity check..\n");
 
-    /* check if this packet is destined for us */
+
     struct sr_if * requested_iface = get_router_interface_by_ip(sr, ip_header->ip_dst);
 
+
+    /* check if TTL expired, if so, send time exceeded icmp */
+       
+    /* check if this packet is destined for us */
     if (requested_iface) {
 
         /* print if list */
@@ -92,6 +96,13 @@ void process_ip_packet(struct sr_instance * sr,
     /* decrement time to live -- we should check if ttl is 0 after this */
     ip_header->ip_ttl--;
 
+    if (ip_header->ip_ttl == 0) {
+        printf("TTL EXCEEDED\n");
+        send_icmp_timeout(sr, eth_packet, requested_iface, incoming_iface);
+        return;
+    }
+
+
     if (!ip_header->ip_ttl) { /* do something */ return; }
 
     /* recompute packet checksum over modified header */
@@ -130,9 +141,7 @@ void process_ip_packet(struct sr_instance * sr,
                                                      len,
                                                      requested_iface->name);
 
-        /* calling handle_arp_req with a non-null interface will cause it
-           to send the request immediately */
-
+        print_hdr_eth(eth_packet);
         send_arp_req(sr, req->ip, incoming_iface);
     }
 }

@@ -201,7 +201,7 @@ void send_arp_req(struct sr_instance *sr, uint32_t ip, struct sr_if *iface) {
     sr_send_packet(sr, new_packet, size, iface->name);
 }
 
-int handle_queued_arp_req(struct sr_instance *sr, struct sr_arpreq *req) {
+int handle_queued_arp_req(struct sr_instance *sr, struct sr_arpreq *req){
     time_t now; time(&now);
 
     /* otherwise, we're dealing with old packets */
