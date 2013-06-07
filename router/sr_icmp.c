@@ -324,8 +324,9 @@ void send_icmp_port_unreachable(struct sr_instance *sr,
     
     /* send */
     sr_send_packet(sr, new_packet, len, incoming_iface->name);  
-    printf("Sent icmp timeout\n");
+    printf("Sent icmp timeout\n"); fflush(stdout);
     free(new_packet);
+    printf("freed our allocated packet\n"); fflush(stdout);
 }
 
 int is_icmp(uint8_t * buf){
