@@ -241,7 +241,13 @@ void send_icmp_host_unreachable(struct sr_instance *sr, struct sr_packet *p) {
     /* populate icmp headers */
     icmp_header->icmp_type = unreachable_type;
     icmp_header->icmp_code = host_code;
-    icmp_header->icmp_sum = cksum(packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t), sizeof(sr_icmp_t3_hdr_t));
+    
+    /* copy original IP packet + 8 bytes into data field of ICMP */
+    memcpy(icmp_header->data, old_ip_header, ICMP_DATA_SIZE);
+
+    icmp_header->icmp_sum = cksum(packet + sizeof(sr_ethernet_hdr_t) 
+                                         + sizeof(sr_ip_hdr_t), 
+                                         sizeof(sr_icmp_t3_hdr_t));
     
     /* set up ethernet frame */
     eth_header->ether_type = htons(ethertype_ip);
