@@ -4,7 +4,6 @@
 #include "sr_protocol.h"
 #include "sr_utils.h"
 
-
 uint16_t cksum (const void *_data, int len) {
   const uint8_t *data = _data;
   uint32_t sum;
@@ -29,7 +28,6 @@ uint8_t ip_protocol(uint8_t *buf) {
   sr_ip_hdr_t *iphdr = (sr_ip_hdr_t *)(buf);
   return iphdr->ip_p;
 }
-
 
 /* Prints out formatted Ethernet address, e.g. 00:11:22:33:44:55 */
 void print_addr_eth(uint8_t *addr) {

@@ -55,6 +55,7 @@ static void sr_load_rt_wrap(struct sr_instance* sr, char* rtable);
  *---------------------------------------------------------------------------*/
 
 int main(int argc, char **argv)
+
 {
     int c;
     char *host   = DEFAULT_HOST;

@@ -12,6 +12,12 @@
 #include <netinet/in.h>
 #include <sys/time.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "sr_utils.h"
+#include "sr_helpers.h"
+#include "sr_rt.h"
+#include "sr_icmp.h"
 
 #include "sr_protocol.h"
 #include "sr_arpcache.h"

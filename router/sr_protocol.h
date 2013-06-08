@@ -45,8 +45,6 @@
 #define IP_MAXPACKET 65535
 #endif
 
-
-
 /* FIXME
  * ohh how lame .. how very, very lame... how can I ever go out in public
  * again?! /mc
@@ -79,6 +77,19 @@
 
 /* Structure of a ICMP header
  */
+enum icmp_code {
+    net_code = 0,
+    host_code = 1,
+    port_code = 3,
+};
+
+enum icmp_type {
+    echo_type = 0,
+    echo_request = 8,
+    unreachable_type = 3,
+    exceeded_type = 11,
+};
+
 struct sr_icmp_hdr {
   uint8_t icmp_type;
   uint8_t icmp_code;
@@ -86,7 +97,6 @@ struct sr_icmp_hdr {
   
 } __attribute__ ((packed)) ;
 typedef struct sr_icmp_hdr sr_icmp_hdr_t;
-
 
 /* Structure of a type3 ICMP header
  */
@@ -101,8 +111,7 @@ struct sr_icmp_t3_hdr {
 } __attribute__ ((packed)) ;
 typedef struct sr_icmp_t3_hdr sr_icmp_t3_hdr_t;
 
-
-
+extern unsigned int globalLength;
 
 /*
  * Structure of an internet header, naked of options.
@@ -135,6 +144,7 @@ typedef struct sr_ip_hdr sr_ip_hdr_t;
 
 /* 
  *  Ethernet packet header prototype.  Too many O/S's define this differently.
+
  *  Easy enough to solve that and define it here.
  */
 struct sr_ethernet_hdr
@@ -148,17 +158,18 @@ struct sr_ethernet_hdr
 } __attribute__ ((packed)) ;
 typedef struct sr_ethernet_hdr sr_ethernet_hdr_t;
 
-
-
 enum sr_ip_protocol {
   ip_protocol_icmp = 0x0001,
+
+  /* added these for convenience */
+  ip_protocol_tcp = 0x0008,
+  ip_protocol_udp = 0x0011,
 };
 
 enum sr_ethertype {
   ethertype_arp = 0x0806,
   ethertype_ip = 0x0800,
 };
-
 
 enum sr_arp_opcode {
   arp_op_request = 0x0001,
@@ -168,7 +179,6 @@ enum sr_arp_opcode {
 enum sr_arp_hrd_fmt {
   arp_hrd_ethernet = 0x0001,
 };
-
 
 struct sr_arp_hdr
 {
@@ -185,5 +195,7 @@ struct sr_arp_hdr
 typedef struct sr_arp_hdr sr_arp_hdr_t;
 
 #define sr_IFACE_NAMELEN 32
+
+
 
 #endif /* -- SR_PROTOCOL_H -- */

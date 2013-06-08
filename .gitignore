@@ -1,0 +1,7 @@
+*.d
+*.o
+*.pyo
+pox
+router/*#*
+index.html
+index.html.1
