@@ -90,7 +90,6 @@ typedef struct
                                PACKET (header)
   ---------------------------------------------------------------------------*/
 
-
 typedef struct
 {
     uint32_t mLen;

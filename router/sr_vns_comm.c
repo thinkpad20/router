@@ -393,8 +393,7 @@ int sr_read_from_server_expect(struct sr_instance* sr /* borrowed */, int expect
         do
         {/* -- just in case SIGALRM breaks recv -- */
             errno = 0; /* -- hacky glibc workaround -- */
-            if ((ret = read(sr->sockfd, buf+4+bytes_read, len - 4 - bytes_read)) ==
-                    -1)
+            if ((ret = read(sr->sockfd, buf+4+bytes_read, len - 4 - bytes_read)) == -1)
             {
                 if ( errno == EINTR )
                 { continue; }
@@ -530,12 +529,12 @@ sr_ether_addrs_match_interface( struct sr_instance* sr, /* borrowed */
     ether_hdr = (struct sr_ethernet_hdr*)buf;
     iface = sr_get_interface(sr, name);
 
-    if ( iface == 0 ){
+    if (iface == 0 ){
         fprintf( stderr, "** Error, interface %s, does not exist\n", name);
         return 0;
     }
 
-    if ( memcmp( ether_hdr->ether_shost, iface->addr, ETHER_ADDR_LEN) != 0 ){
+    if (memcmp(ether_hdr->ether_shost, iface->addr, ETHER_ADDR_LEN) != 0 ){
         fprintf( stderr, "** Error, source address does not match interface\n");
         return 0;
     }
