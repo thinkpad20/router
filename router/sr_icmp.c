@@ -89,7 +89,6 @@ void send_icmp_timeout(struct sr_instance * sr,
         /* send */
         sr_send_packet(sr, new_packet, len, incoming_iface->name);  
         printf("Sent icmp timeout\n");
-
         free(new_packet);
 }
 
