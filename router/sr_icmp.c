@@ -311,8 +311,10 @@ void send_icmp_port_unreachable(struct sr_instance *sr,
     icmp_header->icmp_code = 3;
 
     memcpy(icmp_header->data, packet + sizeof(sr_ethernet_hdr_t), ICMP_DATA_SIZE);
-    icmp_header->icmp_sum = cksum(new_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t), 
-                                  len - (sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)));
+    icmp_header->icmp_sum = cksum(new_packet 
+                                  + sizeof(sr_ethernet_hdr_t) 
+                                  + sizeof(sr_ip_hdr_t), 
+                                  sizeof(sr_icmp_t3_hdr_t));
     
     /* set up ethernet frame */
     eth_header->ether_type = htons(ethertype_ip);
@@ -322,11 +324,8 @@ void send_icmp_port_unreachable(struct sr_instance *sr,
            ETHER_ADDR_LEN);
     
     /* send */
-    printf("About to send icmp timeout, new_packet is %p\n", new_packet); fflush(stdout);
     sr_send_packet(sr, new_packet, len, incoming_iface->name);  
-    printf("Sent icmp timeout, new_packet is %p\n", new_packet); fflush(stdout);
-    /*free(new_packet);*/
-    printf("freed our allocated packet\n"); fflush(stdout);
+    free(new_packet);
 }
 
 int is_icmp(uint8_t * buf){

@@ -36,6 +36,14 @@ void process_ip_packet(struct sr_instance * sr,
         /* print if list */
 
         printf("IP packet destined for us! Interface\n");
+        if (ip_header->ip_ttl == 0) {
+            /* packet has timed out, we ignore it */
+            return;
+        }
+
+        /* decrement TTL */
+        ip_header->ip_ttl--;
+
         sr_print_if(requested_iface);
         
         /* If the packet is an ICMP echo request and its checksum
@@ -48,6 +56,13 @@ void process_ip_packet(struct sr_instance * sr,
 
         /* If the packet contains a TCP or UDP payload, send an
            ICMP port unreachable to the sending host. */
+
+        else if (ip_header->ip_ttl == 0) {
+            /* send timeout */
+            printf("ttl expired, sending timeout\n");
+            send_icmp_timeout(sr, eth_packet, requested_iface, incoming_iface);
+            printf("finished sending timeout\n");
+        }
 
         else if (is_udp_or_tcp(eth_packet, len)) {
 
