@@ -51,7 +51,7 @@ void process_ip_packet(struct sr_instance * sr,
 
         else if (is_udp_or_tcp(eth_packet, len)) {
 
-            printf("GOT UDP/TCP PAYLOAD\n");
+            printf("Got a UDP or TCP message\n");
 
             /*Port unreachable (type 3, code 3) ** Sent if an IP
               packet containing a UDP or TCP payload is sent to one of

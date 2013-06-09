@@ -182,8 +182,6 @@ int is_icmp_echo(uint8_t * packet) {
 
     printf("checking if is icmp echo and printing icmp packet\n");
     /* icmp echo request is code 0 and type 8 */
-    
-    print_hdr_icmp(packet + eth_size + ip_size);
 
     if (icmp_packet->icmp_code == 0 && icmp_packet->icmp_type == 8){
         printf("This is an ICMP echo request\n");
@@ -308,9 +306,9 @@ void send_icmp_port_unreachable(struct sr_instance *sr,
     ip_header->ip_off = ntohs(IP_DF);
     ip_header->ip_len = sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t);
 
-    /* populate icmp headers */
-    icmp_header->icmp_type = 3; /* reply */
-    icmp_header->icmp_code = 1;  /* reply */
+    /* populate icmp headers. For port unreachable, this is type 3, code 3 */
+    icmp_header->icmp_type = 3;
+    icmp_header->icmp_code = 3;
 
     memcpy(icmp_header->data, packet + sizeof(sr_ethernet_hdr_t), ICMP_DATA_SIZE);
     icmp_header->icmp_sum = cksum(new_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t), 

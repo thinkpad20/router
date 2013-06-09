@@ -565,7 +565,6 @@ int sr_send_packet(struct sr_instance* sr /* borrowed */,
 {
     c_packet_header *sr_pkt;
     unsigned int total_len =  len + (sizeof(c_packet_header));
-    printf("sr_send_packet called with buf = %p\n", buf); fflush(stdout);
     /* REQUIRES */
     assert(sr);
     assert(buf);
@@ -578,10 +577,8 @@ int sr_send_packet(struct sr_instance* sr /* borrowed */,
     }
 
     /* Create packet */
-    printf("sr_send_packet about to malloc sr_pkt with len %lu\n", len + sizeof(c_packet_header)); fflush(stdout);
     sr_pkt = (c_packet_header *)malloc(len +
             sizeof(c_packet_header));
-    printf("sr_send_packet malloc'd sr_pkt = %p\n", sr_pkt); fflush(stdout);
     assert(sr_pkt);
     sr_pkt->mLen  = htonl(total_len);
     sr_pkt->mType = htonl(VNSPACKET);
@@ -603,8 +600,6 @@ int sr_send_packet(struct sr_instance* sr /* borrowed */,
         free(sr_pkt);
         return -1;
     }
-
-    printf("sr_send_packet about to free sr_pkt, buf = %p, sr_pkt = %p\n", buf, sr_pkt);
 
     free(sr_pkt);
 
