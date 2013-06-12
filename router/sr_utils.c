@@ -91,6 +91,8 @@ void print_hdr_ip(uint8_t *buf) {
     fprintf(stderr, "\tfragment flag: MF\n");
   else if (ntohs(iphdr->ip_off) & IP_RF)
     fprintf(stderr, "\tfragment flag: R\n");
+  else
+      fprintf(stderr, "\tno fragment flag set\n");
 
   fprintf(stderr, "\tfragment offset: %d\n", ntohs(iphdr->ip_off) & IP_OFFMASK);
   fprintf(stderr, "\tTTL: %d\n", iphdr->ip_ttl);

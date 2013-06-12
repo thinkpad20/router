@@ -149,10 +149,12 @@ void send_icmp_echo(struct sr_instance * sr,
     memcpy(eth_header->ether_dhost, old_eth_header->ether_shost, ETHER_ADDR_LEN);
 
     /* print before send */
+    printf("ECHO!!!\n");
     print_hdrs(new_packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
 
     /* send */
     sr_send_packet(sr, new_packet, globalLength, incoming_iface->name);  
+    
     printf("Sent icmp echo reply\n");
 
     free(new_packet);
@@ -259,9 +261,10 @@ void send_icmp_net_unreachable(struct sr_instance *sr,
     
     /* populate source / dest ip addresses, copy previous info */
     sr_ip_hdr_t * old_ip_header = (sr_ip_hdr_t *)(buff + sizeof(sr_ethernet_hdr_t));
+
     /* memcpy(ip_header, old_ip_header, sizeof(sr_ip_hdr_t)); */
-    
     printf("ip header length: %lu\n", sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
+    printf("ip header length icmp: %lu\n", sizeof(sr_icmp_t3_hdr_t));
 
     /* ip header */
     ip_header->ip_dst = old_ip_header->ip_src;
@@ -272,39 +275,40 @@ void send_icmp_net_unreachable(struct sr_instance *sr,
     ip_header->ip_tos = 0;
     ip_header->ip_hl  = 5;
     ip_header->ip_v   = 4;
-    ip_header->ip_off = IP_DF;
+    ip_header->ip_off = htons(IP_DF);
     ip_header->ip_p   = ip_protocol_icmp;
-    ip_header->ip_len = htons((sr_icmp_t3_hdr_t) + sizeof(sr_ip_hdr_t));
+    ip_header->ip_len = htons(sizeof(sr_icmp_t3_hdr_t) + sizeof(sr_ip_hdr_t));
     
     /* populate icmp headers */
     printf("old ip header\n");
 
     memcpy(icmp_header->data, old_ip_header, ICMP_DATA_SIZE);
-    icmp_header->icmp_type   = 3;
-    icmp_header->icmp_code   = 0;
+    icmp_header->icmp_type   = 3; /* unreachable */
+    icmp_header->icmp_code   = 0; /* net unreachable */
     icmp_header->unused      = 0;
+    icmp_header->next_mtu    = 0;
     icmp_header->icmp_sum    = 0;
-
-    icmp_header->icmp_sum    = cksum(packet + 
-                                     sizeof(sr_ethernet_hdr_t) + 
-                                     sizeof(sr_ip_hdr_t), 
-                                     sizeof(sr_icmp_t3_hdr_t));
 
     ip_header->ip_sum        = cksum(packet + 
                                  sizeof(sr_ethernet_hdr_t),  
                                  sizeof(sr_ip_hdr_t));
-
     
+    icmp_header->icmp_sum    = cksum(packet + 
+                                     sizeof(sr_ethernet_hdr_t) + 
+                                     sizeof(sr_ip_hdr_t), 
+                                     sizeof(sr_icmp_t3_hdr_t));
+ 
     /* set up ethernet frame */
     eth_header->ether_type = htons(ethertype_ip);
     memcpy(eth_header->ether_shost, old_eth_header->ether_dhost, ETHER_ADDR_LEN);
     memcpy(eth_header->ether_dhost, old_eth_header->ether_shost, ETHER_ADDR_LEN);
-    
+
     print_hdrs(packet, len);
 
     sr_print_if(incoming_iface);
 
     sr_send_packet(sr, packet, len, incoming_iface->name);  
+
     printf("Sent net unreachable icmp packet\n");
 
     /* freeing this packet */

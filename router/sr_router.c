@@ -38,7 +38,8 @@ void sr_handlepacket(struct sr_instance* sr,
 		     unsigned int len,
 		     char* interface     /* lent */)
 {
-
+    printf("size of icmp: %d\n", sizeof(sr_icmp_t3_hdr_t));    fflush(stdout);
+    printf("size of ip: %d\n", sizeof(sr_ip_hdr_t));    fflush(stdout);
     globalLength = len;
    /* REQUIRES */
     assert(sr);

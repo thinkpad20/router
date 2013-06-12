@@ -119,15 +119,22 @@ extern unsigned int globalLength;
 struct sr_ip_hdr
   {
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-    unsigned int ip_hl:4;		/* header length */
-    unsigned int ip_v:4;		/* version */
+    unsigned int ip_hl:4;		/* header length, length of
+                                           internet header in 32-bit words */
+
+    unsigned int ip_v:4;		/* version, 4 bits according
+                                           to spec */
+
 #elif __BYTE_ORDER == __BIG_ENDIAN
     unsigned int ip_v:4;		/* version */
     unsigned int ip_hl:4;		/* header length */
 #else
 #error "Byte ordering ot specified " 
 #endif 
-    uint8_t ip_tos;			/* type of service */
+    /*  used to indicate the quality of service desired */
+
+    uint8_t ip_tos;			/* type of service, 8 bits */
+      
     uint16_t ip_len;			/* total length */
     uint16_t ip_id;			/* identification */
     uint16_t ip_off;			/* fragment offset field */
@@ -135,6 +142,10 @@ struct sr_ip_hdr
 #define	IP_DF 0x4000			/* dont fragment flag */
 #define	IP_MF 0x2000			/* more fragments flag */
 #define	IP_OFFMASK 0x1fff		/* mask for fragmenting bits */
+
+    /* ttl is an uppper bound on an internet datagram, aka
+       self-destruct time limit, destroyed if 0 w/o reaching destination */
+
     uint8_t ip_ttl;			/* time to live */
     uint8_t ip_p;			/* protocol */
     uint16_t ip_sum;			/* checksum */
