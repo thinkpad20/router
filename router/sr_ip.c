@@ -27,16 +27,21 @@ void process_ip_packet(struct sr_instance * sr,
     /* check if this packet is destined for us */
     struct sr_if * requested_iface = get_router_interface_by_ip(sr, ip_header->ip_dst);
 
+    /* if timeout exceeded send a timeout exceeded message */
+    if (ip_header->ip_ttl == 0) {
+        send_icmp_timeout(sr, eth_packet, requested_iface, incoming_iface);
+        return;
+    }
+
+
     if (requested_iface) {
 
         /* print if list */
-
         printf("IP packet destined for us! Interface\n");
         sr_print_if(requested_iface);
         
         /* If the packet is an ICMP echo request and its checksum
            is valid, send an ICMP echo reply to the sending host.  */
-
         if (is_icmp_echo(eth_packet) && is_icmp_cksum_valid(eth_packet, len)) { 
             printf("icmp ECHO message, valid cksum, to one of our interfaces\n");
             send_icmp_echo(sr, eth_packet, requested_iface, incoming_iface);
@@ -45,20 +50,20 @@ void process_ip_packet(struct sr_instance * sr,
         /* If the packet contains a TCP or UDP payload, send an
            ICMP port unreachable to the sending host. */
 
-        else if (is_udp_or_tcp(eth_packet, len)) {
+        /*Port unreachable (type 3, code 3) ** Sent if an IP
+          packet containing a UDP or TCP payload is sent to one of
+          the router's interfaces. 
+          This is needed for traceroute to work. */
 
-            printf("GOT UDP/TCP PAYLOAD\n");
+        /* Otherwise, ignore the packet. */
+        else { 
 
-            /*Port unreachable (type 3, code 3) ** Sent if an IP
-              packet containing a UDP or TCP payload is sent to one of
-              the router's interfaces. 
-              This is needed for traceroute to work. */
+            /* "We got a packet destined to one of our interfaces, that wasn't an ICMP\n, */
+            /* therefore we assume its a UDP/TCP packet, so drop it by ignoring it and  */
+            printf("received a tcp / udp packet, send icmp and drop\n");
 
             send_icmp_port_unreachable(sr, eth_packet, requested_iface, incoming_iface);
         }
-
-        /* Otherwise, ignore the packet. */
-        else { printf("ignoring packet\n"); }
 
         return;
     }
@@ -68,6 +73,7 @@ void process_ip_packet(struct sr_instance * sr,
 
     /* find interface and routing table entry that best match input IP */
     requested_iface = find_longest_prefix_match_interface(sr, ip_header->ip_dst);
+
     struct sr_rt *match = find_longest_prefix_match(sr, ip_header->ip_dst);
 
     /* if this is null, we have absolutely no match, and send an error */
