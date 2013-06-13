@@ -28,11 +28,6 @@ void process_ip_packet(struct sr_instance * sr,
     struct sr_if * requested_iface = get_router_interface_by_ip(sr, ip_header->ip_dst);
 
     /* if timeout exceeded send a timeout exceeded message */
-    if (ip_header->ip_ttl == 0) {
-        send_icmp_timeout(sr, eth_packet, requested_iface, incoming_iface);
-        return;
-    }
-
 
     if (requested_iface) {
 
@@ -97,8 +92,12 @@ void process_ip_packet(struct sr_instance * sr,
 
     /* decrement time to live -- we should check if ttl is 0 after this */
     ip_header->ip_ttl--;
+    if (ip_header->ip_ttl == 0) {
+        send_icmp_timeout(sr, eth_packet, requested_iface, incoming_iface);
+        return;
+    }
 
-    if (!ip_header->ip_ttl) { /* do something */ return; }
+
 
     /* recompute packet checksum over modified header */
     ip_header->ip_sum = 0;
